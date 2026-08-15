@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  # Development overrides
+  frontend:
+    build:
+      context: ../apps/frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../apps/frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+
+  backend:
+    build:
+      context: ../apps/backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../apps/backend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+
+  ingestion-pipeline:
+    build:
+      context: ../apps/ingestion-pipeline
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../apps/ingestion-pipeline:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=true
+
+  retrieval-pipeline:
+    build:
+      context: ../apps/retrieval-pipeline
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../apps/retrieval-pipeline:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=true
+
+  generation-pipeline:
+    build:
+      context: ../apps/generation-pipeline
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../apps/generation-pipeline:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=true

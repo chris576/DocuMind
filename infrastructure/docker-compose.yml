@@ -1,0 +1,154 @@
+version: "3.8"
+
+services:
+  # Frontend
+  frontend:
+    build:
+      context: ../apps/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://backend:3001
+    depends_on:
+      - backend
+    networks:
+      - paperless-network
+
+  # Backend (NestJS)
+  backend:
+    build:
+      context: ../apps/backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - BACKEND_PORT=3001
+      - DATABASE_URL=postgresql://paperless:paperless@postgres:5432/paperless_ai
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      - PAPERLESS_API_URL=${PAPERLESS_API_URL}
+      - PAPERLESS_API_TOKEN=${PAPERLESS_API_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OLLAMA_API_URL=${OLLAMA_API_URL:-http://localhost:11434}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CUSTOM_BASE_URL=${CUSTOM_BASE_URL}
+      - CUSTOM_API_KEY=${CUSTOM_API_KEY}
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
+      - CHROMA_URL=http://chromadb:8000
+      - INGESTION_PIPELINE_URL=http://ingestion-pipeline:8001
+      - RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:8002
+      - GENERATION_PIPELINE_URL=http://generation-pipeline:8003
+      - EXTERNAL_API_ENABLED=${EXTERNAL_API_ENABLED:-false}
+    depends_on:
+      - postgres
+      - rabbitmq
+      - chromadb
+    networks:
+      - paperless-network
+
+  # Ingestion Pipeline (Python)
+  ingestion-pipeline:
+    build:
+      context: ../apps/ingestion-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PAPERLESS_API_URL=${PAPERLESS_API_URL}
+      - PAPERLESS_API_TOKEN=${PAPERLESS_API_TOKEN}
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
+      - CHROMA_URL=http://chromadb:8000
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - rabbitmq
+      - chromadb
+    networks:
+      - paperless-network
+
+  # Retrieval Pipeline (Python)
+  retrieval-pipeline:
+    build:
+      context: ../apps/retrieval-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
+      - CHROMA_URL=http://chromadb:8000
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - rabbitmq
+      - chromadb
+    networks:
+      - paperless-network
+
+  # Generation Pipeline (Python)
+  generation-pipeline:
+    build:
+      context: ../apps/generation-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OLLAMA_API_URL=${OLLAMA_API_URL:-http://localhost:11434}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CUSTOM_BASE_URL=${CUSTOM_BASE_URL}
+      - CUSTOM_API_KEY=${CUSTOM_API_KEY}
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - rabbitmq
+    networks:
+      - paperless-network
+
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=paperless
+      - POSTGRES_PASSWORD=paperless
+      - POSTGRES_DB=paperless_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - paperless-network
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - paperless-network
+
+  # ChromaDB
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - paperless-network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  chroma_data:
+
+networks:
+  paperless-network:
+    driver: bridge
