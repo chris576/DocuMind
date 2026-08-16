@@ -1,4 +1,4 @@
-import { SearchResult, ChatMessage } from '../types';
+import { SearchResult, ChatMessage } from '../types/index.js';
 
 export interface IVectorDB {
   initialize(): Promise<boolean>;

@@ -1,7 +1,7 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { SearchRequestDto, AskQuestionDto } from '@paperless/shared';
+import type { SearchRequestDto, AskQuestionDto } from '@paperless/shared';
 import { MessagingService, PipelineRoutingKey } from '../messaging/messaging.service';
 
 @Injectable()

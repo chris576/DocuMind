@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
 import { ExternalToken } from './entities/external-token.entity';
 import { ExternalTokenUsage } from './entities/external-token-usage.entity';
-import { CreateTokenDto, TokenResponseDto } from '@paperless/shared';
+import type { CreateTokenDto, TokenResponseDto } from '@paperless/shared';
 
 @Injectable()
 export class ExternalApiService {

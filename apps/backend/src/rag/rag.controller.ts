@@ -2,7 +2,7 @@ import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RagService } from './rag.service';
-import { SearchRequestDto, AskQuestionDto } from '@paperless/shared';
+import type { SearchRequestDto, AskQuestionDto } from '@paperless/shared';
 
 @ApiTags('RAG')
 @ApiBearerAuth()

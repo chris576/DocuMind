@@ -2,7 +2,7 @@ import { Controller, Post, Get, Delete, Body, Param, UseGuards, Request, HttpCod
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ExternalApiService } from './external-api.service';
-import { CreateTokenDto } from '@paperless/shared';
+import type { CreateTokenDto } from '@paperless/shared';
 
 @ApiTags('External API Tokens')
 @ApiBearerAuth()

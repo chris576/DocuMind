@@ -1,4 +1,4 @@
-import { ChatMessage, SearchResult } from '../types';
+import { ChatMessage, SearchResult } from '../types/index.js';
 
 export interface SearchRequestDto {
   query: string;

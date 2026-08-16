@@ -2,7 +2,7 @@ import { Controller, Post, Body, UseGuards, Sse, MessageEvent } from '@nestjs/co
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChatService } from './chat.service';
-import { ChatInitDto, ChatMessageDto } from '@paperless/shared';
+import type { ChatInitDto, ChatMessageDto } from '@paperless/shared';
 import { Observable, map } from 'rxjs';
 
 @ApiTags('Chat')
