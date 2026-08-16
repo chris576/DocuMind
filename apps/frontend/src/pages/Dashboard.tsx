@@ -3,7 +3,7 @@ export default function Dashboard() {
     <div>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
       <p className="mt-2 text-gray-600 dark:text-gray-400">
-        Welcome to Paperless-AI. Your AI-powered document management system.
+        Welcome to DMS-RAG. Your AI-powered document management system.
       </p>
       <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">

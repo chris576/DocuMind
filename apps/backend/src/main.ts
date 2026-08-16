@@ -19,8 +19,8 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('Paperless-AI API')
-    .setDescription('AI-powered document management for Paperless-ngx')
+    .setTitle('DMS-RAG API')
+    .setDescription('AI-powered document management for any DMS/ERP')
     .setVersion('1.0')
     .addBearerAuth()
     .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')

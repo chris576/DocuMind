@@ -1,5 +1,5 @@
 {
-  "name": "paperless-ai-monorepo",
+  "name": "dms-rag-monorepo",
   "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@9.15.0",
@@ -16,11 +16,12 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "keywords": [
-    "paperless-ngx",
+    "dms",
+    "rag",
     "ai",
-    "paperless",
-    "artificial",
-    "intelligence"
+    "document-management",
+    "paperless-ngx",
+    "retrieval-augmented-generation"
   ],
   "author": "Clusterzx",
   "license": "MIT",

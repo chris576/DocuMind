@@ -1,7 +1,7 @@
 [project]
-name = "paperless-ai-ingestion"
+name = "dms-rag-ingestion"
 version = "1.0.0"
-description = "Document ingestion pipeline for Paperless-AI"
+description = "Document ingestion pipeline for DMS-RAG"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",

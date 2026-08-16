@@ -4,7 +4,7 @@ title: "[Bug]: "
 labels: ["bug", "triage"]
 assignees:
   - ""
-projects: ["clusterzx/paperless-ai"]
+projects: ["chris576/paperless-rag"]
 
 body:
   - type: markdown
@@ -65,11 +65,11 @@ body:
       required: true
 
   - type: input
-    id: paperless_ai_version
+    id: dms_rag_version
     attributes:
-      label: "🏷️ Paperless-AI Version"
-      description: "What version of Paperless-AI are you using? You can find this in your settings or docker-compose file."
-      placeholder: "e.g. v1.2.3, latest, commit hash, etc."
+      label: "🏷️ DMS-RAG Version"
+      description: "What version of DMS-RAG are you using? You can find this in your settings or docker-compose file."
+      placeholder: "e.g. v1.0.0, latest, commit hash, etc."
     validations:
       required: true
 
@@ -95,7 +95,7 @@ body:
     id: screenshots
     attributes:
       label: "🖼️ Screenshots of your settings page"
-      description: "Attach screenshots of your currenct paperless-ai settings."
+      description: "Attach screenshots of your current DMS-RAG settings."
       placeholder: "Drag & drop images or provide a link."
 
   - type: dropdown

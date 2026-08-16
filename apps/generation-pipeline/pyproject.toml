@@ -1,7 +1,7 @@
 [project]
-name = "paperless-ai-generation"
+name = "dms-rag-generation"
 version = "1.0.0"
-description = "Answer generation pipeline for Paperless-AI"
+description = "Answer generation pipeline for DMS-RAG"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",

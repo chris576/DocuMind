@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="favicon.ico"><favicon href="favicon.ico">
-    <title>Paperless AI - AI Captain, Documents Ahead</title>
+    <title>DMS-RAG - AI Captain, Documents Ahead</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
@@ -489,14 +489,14 @@
     <nav>
         <div class="nav-content">
             <a href="#" class="logo">
-                <img src="ppai_icon.png" alt="Paperless AI Logo" style="height: 60px;">
-                Paperless AI
+                <img src="ppai_icon.png" alt="DMS-RAG Logo" style="height: 60px;">
+                DMS-RAG
             </a>
             <div class="nav-links">
                 <a href="#features">Features</a>
                 <a href="#screenshots">Screenshots</a>
                 <a href="#installation">Installation</a>
-                <a href="https://github.com/clusterzx/paperless-ai/wiki/1.-Home">Documentation</a>
+                <a href="https://github.com/chris576/paperless-rag">Documentation</a>
             </div>
         </div>
     </nav>
@@ -504,34 +504,34 @@
     <header>
         <div class="hero-content">
             <h1>AI Captain, Documents Ahead</h1>
-            <p>The most advanced AI companion for Paperless-NGX. Transform your document management with powerful AI-driven automation and insights.</p>
+            <p>Open-source RAG backend for any DMS/ERP. Transform your document management with powerful AI-driven automation and insights — regardless of where your documents live.</p>
             <a href="#features" class="cta-button">Explore Features</a>
         </div>
         <div class="hero-image">
-            <img src="hero.png" alt="Paperless AI Dashboard" />
+            <img src="hero.png" alt="DMS-RAG Dashboard" />
         </div>
     </header>
 
     <section id="features" class="features-grid">
         <div class="feature-card">
+            <i class="fas fa-plug feature-icon"></i>
+            <h3>DMS-Agnostic Connectors</h3>
+            <p>Connect any DMS or ERP through a clean connector interface. Paperless-ngx ships as the reference connector — more sources follow.</p>
+        </div>
+        <div class="feature-card">
             <i class="fas fa-message feature-icon"></i>
-            <h3>Document Chat</h3>
-            <p>Interact with your documents through natural conversation. Ask questions and get instant, AI-powered responses.</p>
+            <h3>RAG Document Chat</h3>
+            <p>Interact with your documents through natural conversation. Ask questions and get instant, AI-powered answers grounded in your archive.</p>
         </div>
         <div class="feature-card">
-            <i class="fas fa-code feature-icon"></i>
-            <h3>AI Playground</h3>
-            <p>Experiment with different AI models and customize document processing workflows to suit your needs.</p>
+            <i class="fas fa-robot feature-icon"></i>
+            <h3>Automated Processing</h3>
+            <p>Automatically classify, tag, and title incoming documents using OpenAI-compatible APIs and Ollama.</p>
         </div>
         <div class="feature-card">
-            <i class="fas fa-history feature-icon"></i>
-            <h3>Smart History</h3>
-            <p>Keep track of all document interactions and AI processing with detailed historical records.</p>
-        </div>
-        <div class="feature-card">
-            <i class="fas fa-gear feature-icon"></i>
-            <h3>Custom Settings</h3>
-            <p>Fine-tune your AI processing parameters and document management preferences with ease.</p>
+            <i class="fas fa-database feature-icon"></i>
+            <h3>Vector-DB Factory</h3>
+            <p>Choose your vector database — Chroma, Qdrant, or PGVector — through a single factory pattern. No lock-in.</p>
         </div>
     </section>
 
@@ -544,15 +544,15 @@
             <div class="screenshot-card" onclick="openLightbox(this)">
                 <img src="chat.png" alt="Document Chat Interface" />
                 <div class="screenshot-overlay">
-                    <h3>Document Chat</h3>
+                    <h3>RAG Document Chat</h3>
                     <p>Interactive AI-powered document conversations</p>
                 </div>
             </div>
             <div class="screenshot-card" onclick="openLightbox(this)">
-                <img src="playground.png" alt="AI Playground Interface" />
+                <img src="hero.png" alt="Dashboard Interface" />
                 <div class="screenshot-overlay">
-                    <h3>AI Playground</h3>
-                    <p>Experiment with different AI models and parameters</p>
+                    <h3>Dashboard</h3>
+                    <p>Overview of documents, processing status, and RAG health</p>
                 </div>
             </div>
             <div class="screenshot-card" onclick="openLightbox(this)">
@@ -586,29 +586,26 @@
                     <span class="dot dot-yellow"></span>
                     <span class="dot dot-green"></span>
                 </div>
-                <span class="terminal-title">paperless-ai installation</span>
+                <span class="terminal-title">dms-rag installation</span>
             </div>
 
             <div class="terminal-content">
                 <div class="tab-content active" id="docker-content">
                     <div class="command-line">
                         <span class="prompt">$</span>
-                        <span class="command">Quick start with Docker</span>
+                        <span class="command">Quick start with Docker Compose</span>
                     </div>
                     <div class="code-block">
                         <button class="copy-button">
                             <i class="far fa-copy"></i>
                             Copy
                         </button>
-                        <pre><code>docker pull clusterzx/paperless-ai:latest
+                        <pre><code>git clone https://github.com/chris576/paperless-rag.git
+cd paperless-rag
+cp .env.example .env
+# Fill in PAPERLESS_API_URL, PAPERLESS_API_TOKEN, JWT_SECRET, ...
 
-docker run -d \
-    --name paperless-ai \
-    --network bridge \
-    -v paperless-ai_data:/app/data \
-    -p 3000:3000 \
-    --restart unless-stopped \
-    clusterzx/paperless-ai
+docker compose -f infrastructure/docker-compose.yml up -d
                           </code></pre>
                     </div>
                 </div>
@@ -623,10 +620,10 @@ docker run -d \
                             <i class="far fa-copy"></i>
                             Copy
                         </button>
-                        <pre><code>git clone https://github.com/clusterzx/paperless-ai.git
-cd paperless-ai
-pip install -r requirements.txt
-python main.py</code></pre>
+                        <pre><code>git clone https://github.com/chris576/paperless-rag.git
+cd paperless-rag
+pnpm install
+pnpm dev</code></pre>
                     </div>
                 </div>
 
@@ -640,7 +637,10 @@ python main.py</code></pre>
                             <i class="far fa-copy"></i>
                             Copy
                         </button>
-                        <pre><code>Goto http://your-paperless-ai-instance/setup</code></pre>
+                        <pre><code># Configure via environment variables (.env)
+# See .env.example for all options.
+# Frontend:  http://localhost:3000
+# Backend:   http://localhost:3001</code></pre>
                     </div>
                 </div>
             </div>
@@ -658,7 +658,7 @@ python main.py</code></pre>
         <div class="footer-content">
             <div class="footer-section">
                 <h3>About</h3>
-                <p>Paperless AI is revolutionizing document management with cutting-edge AI technology.</p>
+                <p>DMS-RAG is revolutionizing document management with cutting-edge AI technology.</p>
             </div>
             <div class="footer-section">
                 <h3>Resources</h3>

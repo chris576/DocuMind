@@ -1,4 +1,4 @@
-# AGENTS.md — paperless-ai / DMS-RAG
+# AGENTS.md — DMS-RAG
 
 Konventionen für KI-Agenten (Copilot, Claude Code, Codex, Hermes u. a.) bei der Arbeit an diesem Projekt.
 

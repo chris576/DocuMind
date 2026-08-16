@@ -1,18 +1,8 @@
-# 📄 Paperless-AI
+# 📄 DMS-RAG
 
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/t/clusterzx/paperless-ai)](https://github.com/clusterzx/paperless-ai/commits/main)
-[![Docker Pulls](https://img.shields.io/docker/pulls/clusterzx/paperless-ai)](https://hub.docker.com/r/clusterzx/paperless-ai)
-[![GitHub Stars](https://img.shields.io/github/stars/clusterzx)](https://github.com/clusterzx)
-[![License](https://img.shields.io/github/license/clusterzx/paperless-ai?cacheSeconds=1)](LICENSE)
+[![License](https://img.shields.io/github/license/chris576/paperless-rag?cacheSeconds=1)](LICENSE)
 
-# ⚠️ IMPORTANT NOTICE:
-This repo is currently not maintained. I appreciate all the efforts from the community pushing PRs and creating issues.
-I'm currently rewriting the entire codebase with a more stable, up-to-date architecture. But I'm limited to evenings, and doing support here while also working on the rewrite just isn't feasible for me.
-With the upcoming official AI integration in Paperless-ngx itself, I'm also not sure if I'll complete the rewrite or continue maintaining this repo at all.
-
----
-
-**Paperless-AI** is an AI-powered extension for [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx) that brings automatic document classification, smart tagging, and semantic search using OpenAI-compatible APIs and Ollama.
+**DMS-RAG** is an open-source RAG (Retrieval-Augmented Generation) backend for companies whose documents live in non-standardized DMS, ERP, or industry solutions. It brings automatic document classification, smart tagging, and semantic search using OpenAI-compatible APIs and Ollama.
 
 It enables **fully automated document workflows**, **contextual chat**, and **powerful customization** — all via an intuitive web interface.
 
@@ -27,8 +17,13 @@ Powered by **Retrieval-Augmented Generation (RAG)**, you can now search semantic
 
 ## ✨ Features
 
+### 🔌 DMS-Agnostic Connector Layer
+- Connector interface for any DMS/ERP source — Paperless-ngx is the reference connector
+- Normalized document model (`DocumentRecord`, `DocumentContent`) keeps the rest of the app source-agnostic
+- Registry + factory pattern: new connectors are added without touching selection logic
+
 ### 🔄 Automated Document Processing
-- Detects new documents in Paperless-ngx automatically
+- Detects new documents in your DMS automatically
 - Analyzes content using OpenAI API, Ollama, and other compatible backends
 - Assigns title, tags, document type, and correspondent
 - Built-in support for:
@@ -48,58 +43,71 @@ Powered by **Retrieval-Augmented Generation (RAG)**, you can now search semantic
 - Natural language document search and Q&A
 - Understands full document context (not just keywords)
 - Semantic memory powered by your own data
-- Fast, intelligent, privacy-friendly document queries  
-![RAG_CHAT_DEMO](https://raw.githubusercontent.com/clusterzx/paperless-ai/refs/heads/main/ppairag.png)
+- Fast, intelligent, privacy-friendly document queries
 
-### ⚙️ Manual Processing
-- Web interface for manual AI tagging
-- Useful when reviewing sensitive documents
-- Accessible via `/manual`
-
-### 🧩 Smart Tagging & Rules
-- Define rules to limit which documents are processed
-- Disable prompts and apply tags automatically
-- Set custom output tags for tracked classification  
-![PPAI_SHOWCASE3](https://github.com/user-attachments/assets/1fc9f470-6e45-43e0-a212-b8fa6225e8dd)
+### 🏗️ Modern Monorepo Architecture
+- pnpm + Turbo workspace (`apps/*` + `packages/*`)
+- NestJS 10 backend (`apps/backend`, port 3001)
+- Vite 6 + React 18 frontend (`apps/frontend`, port 3000)
+- Python pipelines (FastAPI): Ingestion (8001), Retrieval (8002), Generation (8003)
+- RabbitMQ messaging (topic exchange `paperless_ai`)
+- Vector-DB factory: Chroma / Qdrant / PGVector
+- TypeScript 7 (native Go compiler) across the monorepo — the backend stays on TS 5.9 for NestJS toolchain compatibility
 
 ---
 
 ## 🚀 Installation
 
-> ⚠️ **First-time install:** Restart the container **after completing setup** (API keys, preferences) to build RAG index.  
-> 🔁 Not required for updates.
+### 🐳 Docker Compose (recommended)
 
-📘 [Installation Wiki](https://github.com/clusterzx/paperless-ai/wiki/2.-Installation)
+```bash
+git clone https://github.com/chris576/paperless-rag.git
+cd paperless-rag
+cp .env.example .env
+# Fill in PAPERLESS_API_URL, PAPERLESS_API_TOKEN, JWT_SECRET, ...
+docker compose -f infrastructure/docker-compose.yml up -d
+```
 
----
+Services:
 
-## 🐳 Docker Support
+| Service | URL / Port |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend (NestJS) | http://localhost:3001 |
+| Ingestion pipeline | http://localhost:8001 |
+| Retrieval pipeline | http://localhost:8002 |
+| Generation pipeline | http://localhost:8003 |
+| PostgreSQL | 5432 |
+| RabbitMQ (management) | 5672 / 15672 |
+| ChromaDB | 8000 |
 
-- Health monitoring and auto-restart
-- Persistent volumes and graceful shutdown
-- Works out of the box with minimal setup
-
----
-
-## 🔧 Local Development
+### 🔧 Local Development
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
-# Start development/test mode
-npm run test
+# Start all services in watch mode
+pnpm dev
+
+# Build all packages
+pnpm build
+
+# Type-check all packages
+pnpm typecheck
 ```
 
 ---
 
 ## 🧭 Roadmap Highlights
 
+- ✅ DMS-agnostic connector layer (Paperless-ngx reference connector)
 - ✅ Multi-AI model support
 - ✅ Multilingual document analysis
-- ✅ Tag rules and filters
 - ✅ Integrated document chat with RAG
-- ✅ Responsive web interface
+- ✅ Vector-DB factory (Chroma / Qdrant / PGVector)
+- 🚧 MCP server for agent access (Hermes, OpenClaw, …)
+- 🚧 Additional connectors (generic REST/OData, Nextcloud/WebDAV, ELO, d.velop, windream, DATEV)
 
 ---
 
@@ -119,22 +127,6 @@ Then open a Pull Request via GitHub.
 
 ---
 
-## 🆘 Support & Community
-
-- [Issues](https://github.com/clusterzx/paperless-ai/issues)
-- [Discord](https://discord.gg/AvNekAfK38)
-
----
-
 ## 📄 License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-## 🙏 Support Development
-
-[![Patreon](https://img.shields.io/badge/Patreon-F96854?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/c/clusterzx)
-[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/paypalme/bech0r)
-[![BuyMeACoffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/clusterzx)
-[![Ko-Fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/clusterzx)
