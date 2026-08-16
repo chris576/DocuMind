@@ -19,18 +19,18 @@ export class DocumentsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get document by ID' })
   async findOne(@Param('id') id: string) {
-    return this.documentsService.findOne(parseInt(id, 10));
+    return this.documentsService.findOne(id);
   }
 
   @Post(':id/process')
   @ApiOperation({ summary: 'Process document with AI' })
   async process(@Param('id') id: string) {
-    return this.documentsService.processDocument(parseInt(id, 10));
+    return this.documentsService.processDocument(id);
   }
 
   @Get(':id/content')
   @ApiOperation({ summary: 'Get document content' })
   async getContent(@Param('id') id: string) {
-    return this.documentsService.getContent(parseInt(id, 10));
+    return this.documentsService.getContent(id);
   }
 }

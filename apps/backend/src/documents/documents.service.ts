@@ -1,63 +1,55 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import axios from 'axios';
+import { Inject, Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { DOCUMENT_CONNECTOR } from './connectors/document-connector.interface';
+import type {
+  DocumentConnector,
+  DocumentRecord,
+  DocumentContent,
+} from './connectors/document-connector.interface';
 
+/**
+ * Facade over the active {@link DocumentConnector}.
+ *
+ * This service does not know which document source it talks to — it delegates
+ * to the connector resolved via the {@link DOCUMENT_CONNECTOR} injection token
+ * and maps connector failures to consistent HTTP errors.
+ */
 @Injectable()
 export class DocumentsService {
-  private readonly paperlessUrl = process.env.PAPERLESS_API_URL;
-  private readonly paperlessToken = process.env.PAPERLESS_API_TOKEN;
+  constructor(
+    @Inject(DOCUMENT_CONNECTOR) private readonly connector: DocumentConnector,
+  ) {}
 
-  private get headers() {
-    return {
-      Authorization: `Token ${this.paperlessToken}`,
-      'Content-Type': 'application/json',
-    };
+  async findAll(): Promise<DocumentRecord[]> {
+    return this.handle(
+      () => this.connector.listDocuments(),
+      'Failed to fetch documents',
+    );
   }
 
-  async findAll() {
-    try {
-      const response = await axios.get(`${this.paperlessUrl}/api/documents/`, {
-        headers: this.headers,
-      });
-      return response.data;
-    } catch (error) {
-      throw new HttpException(
-        'Failed to fetch documents',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+  async findOne(id: string): Promise<DocumentRecord> {
+    return this.handle(
+      () => this.connector.getDocument(id),
+      'Failed to fetch document',
+    );
   }
 
-  async findOne(id: number) {
-    try {
-      const response = await axios.get(`${this.paperlessUrl}/api/documents/${id}/`, {
-        headers: this.headers,
-      });
-      return response.data;
-    } catch (error) {
-      throw new HttpException(
-        'Failed to fetch document',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+  async getContent(id: string): Promise<DocumentContent> {
+    return this.handle(
+      () => this.connector.getDocumentContent(id),
+      'Failed to fetch document content',
+    );
   }
 
-  async getContent(id: number) {
-    try {
-      const response = await axios.get(
-        `${this.paperlessUrl}/api/documents/${id}/download/txt/`,
-        { headers: this.headers },
-      );
-      return response.data;
-    } catch (error) {
-      throw new HttpException(
-        'Failed to fetch document content',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  async processDocument(id: number) {
-    // TODO: Implement document processing with AI
+  async processDocument(id: string) {
+    // TODO: Implement document processing with AI (delegate to ingestion pipeline).
     return { status: 'processing', documentId: id };
+  }
+
+  private async handle<T>(fn: () => Promise<T>, message: string): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      throw new HttpException(message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }
