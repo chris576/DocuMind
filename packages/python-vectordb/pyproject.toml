@@ -1,0 +1,30 @@
+[project]
+name = "python-vectordb"
+version = "1.0.0"
+description = "Vector database, embedding and reranking components for DMS-RAG"
+requires-python = ">=3.11"
+dependencies = [
+    "sentence-transformers>=3.3.0",
+    "chromadb>=0.5.0",
+    "qdrant-client>=1.12.0",
+    "psycopg2-binary>=2.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = [
+    "python_vectordb",
+    "python_vectordb.embeddings",
+    "python_vectordb.reranking",
+    "python_vectordb.vector_db",
+]

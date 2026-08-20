@@ -72,7 +72,7 @@ By installing and using the Application, you agree to this privacy policy. You c
 ## 10. Technical Details
 
 ### 10.1 Data Storage Location
-All data is stored on your own infrastructure (PostgreSQL, vector database, RabbitMQ). No data is stored on maintainer servers.
+All data is stored on your own infrastructure (PostgreSQL, vector database). No data is stored on maintainer servers.
 
 ### 10.2 Data Processing
 - Document content is processed only when explicitly requested through the chat interface or automated processing

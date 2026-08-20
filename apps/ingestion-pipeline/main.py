@@ -1,15 +1,21 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.data_manager import DataManager
+from python_common.env import get_env
+from python_common.http import post_json
+from python_dms.config import load_dms_config
+from python_dms import DocumentProviderFactory
+from python_vectordb.config import load_vector_db_config
+from python_vectordb.vector_db import VectorDBFactory
+
+from src.ingestion_service import IngestionService
 from src.tasks import IngestionTask
 from src.models import IngestionRequest
-from src.messaging import RabbitMQClient
-from src.message_handlers import MessageHandler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,45 +24,28 @@ logging.basicConfig(
 logger = logging.getLogger("ingestion")
 
 # Global instances
-data_manager: DataManager = None
+ingestion_service: IngestionService = None
 ingestion_task: IngestionTask = None
-rabbitmq_client: RabbitMQClient = None
-message_handler: MessageHandler = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global data_manager, ingestion_task, rabbitmq_client, message_handler
+    global ingestion_service, ingestion_task
 
     logger.info("Starting Ingestion Pipeline")
 
-    config = {
-        "paperless_api_url": os.getenv("PAPERLESS_API_URL"),
-        "paperless_api_token": os.getenv("PAPERLESS_API_TOKEN"),
-        "vector_db_type": os.getenv("VECTOR_DB_TYPE", "chroma"),
-        "chroma_url": os.getenv("CHROMA_URL", "http://localhost:8000"),
-        "collection_name": os.getenv("COLLECTION_NAME", "documents"),
-        "embedding_model": os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2"),
-    }
+    dms_config = load_dms_config()
+    vector_db_config = load_vector_db_config()
 
-    data_manager = DataManager(config)
-    ingestion_task = IngestionTask(data_manager)
+    # Write-only vector database access (CQRS): ingestion never reads.
+    vector_db = VectorDBFactory.create_writer(vector_db_config.to_vector_db_config())
+    document_provider = DocumentProviderFactory.create(
+        dms_config.to_document_provider_config()
+    )
 
-    # Connect to RabbitMQ
-    rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
-    rabbitmq_client = RabbitMQClient(rabbitmq_url)
-    connected = await rabbitmq_client.connect("ingestion")
-    
-    if connected:
-        message_handler = MessageHandler(rabbitmq_client, ingestion_task)
-        await rabbitmq_client.consume(message_handler.handle_ingestion_message)
-        logger.info("RabbitMQ consumer started")
-    else:
-        logger.warning("RabbitMQ not available, continuing without messaging")
+    ingestion_service = IngestionService(document_provider, vector_db)
+    ingestion_task = IngestionTask(ingestion_service)
 
     yield
-
-    if rabbitmq_client:
-        await rabbitmq_client.close()
 
     logger.info("Shutting down Ingestion Pipeline")
 
@@ -76,24 +65,44 @@ app.add_middleware(
 
 @app.get("/status")
 async def status():
-    return data_manager.get_status()
+    return ingestion_service.get_status()
 
 @app.get("/health")
 async def health():
     return {
-        "status": "healthy" if data_manager.is_initialized else "unhealthy",
+        "status": "healthy" if ingestion_service.is_initialized else "unhealthy",
         "service": "ingestion-pipeline"
     }
+
+async def _push_documents_to_retrieval():
+    """Push all loaded documents to the retrieval pipeline to rebuild its BM25 index."""
+    retrieval_url = get_env("RETRIEVAL_PIPELINE_URL", "http://localhost:8002")
+    documents = [asdict(doc) for doc in ingestion_service.documents]
+
+    if not documents:
+        logger.info("No documents to push to retrieval pipeline")
+        return
+
+    logger.info(f"Pushing {len(documents)} documents to retrieval pipeline")
+    await post_json(f"{retrieval_url}/index/build", {"documents": documents})
+
+
+async def _run_ingestion_and_push(force_update: bool, check_new: bool):
+    """Run ingestion and, on success, notify the retrieval pipeline."""
+    try:
+        result = ingestion_task.run(force_update=force_update, check_new=check_new)
+        if result.get("status") == "completed":
+            await _push_documents_to_retrieval()
+    except Exception as e:
+        logger.error(f"Ingestion background run failed: {str(e)}")
+
 
 @app.post("/ingest")
 async def ingest(request: IngestionRequest, background_tasks: BackgroundTasks):
     if ingestion_task.running:
         return {"status": "running", "message": "Ingestion already in progress"}
 
-    if request.force:
-        background_tasks.add_task(ingestion_task.run, force_update=True)
-    else:
-        background_tasks.add_task(ingestion_task.run, check_new=request.check_new)
+    background_tasks.add_task(_run_ingestion_and_push, request.force, request.check_new)
 
     return {"status": "started", "message": "Ingestion started in background"}
 
@@ -103,11 +112,13 @@ async def ingest_sync(request: IngestionRequest):
         return {"status": "running", "message": "Ingestion already in progress"}
 
     result = ingestion_task.run(force_update=request.force, check_new=request.check_new)
+    if result.get("status") == "completed":
+        await _push_documents_to_retrieval()
     return result
 
 @app.post("/check")
 async def check_updates():
-    needs_update, message = data_manager.check_for_updates()
+    needs_update, message = ingestion_service.check_for_updates()
     return {"needs_update": needs_update, "message": message}
 
 if __name__ == "__main__":

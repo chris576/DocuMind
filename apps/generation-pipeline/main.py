@@ -9,10 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from src.providers import LLMProviderFactory, BaseLLMProvider
-from src.models import GenerateRequest, GenerateResponse, ChatInitRequest, ChatMessageRequest, ChatMessage
-from src.messaging import RabbitMQClient
-from src.message_handlers import MessageHandler
+from python_llm import LLMProviderFactory, BaseLLMProvider, GenerateRequest, GenerateResponse, ChatMessage
+from python_llm.config import load_llm_config
+
+from src.models import ChatInitRequest, ChatMessageRequest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,8 +23,6 @@ logger = logging.getLogger("generation")
 # Global state
 llm_provider: BaseLLMProvider = None
 chat_sessions: Dict[str, dict] = {}
-rabbitmq_client: RabbitMQClient = None
-message_handler: MessageHandler = None
 
 class StatusResponse(BaseModel):
     service: str
@@ -34,36 +32,17 @@ class StatusResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global llm_provider, rabbitmq_client, message_handler
+    global llm_provider
 
     logger.info("Starting Generation Pipeline")
 
-    provider_type = os.getenv("LLM_PROVIDER", "ollama")
-    config = {
-        "model": os.getenv("LLM_MODEL", "llama3.2"),
-        "api_key": os.getenv("OPENAI_API_KEY"),
-        "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-    }
-
-    llm_provider = LLMProviderFactory.create(provider_type, config)
-    logger.info(f"Initialized LLM provider: {provider_type}")
-
-    # Connect to RabbitMQ
-    rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
-    rabbitmq_client = RabbitMQClient(rabbitmq_url)
-    connected = await rabbitmq_client.connect("generation")
-
-    if connected:
-        message_handler = MessageHandler(rabbitmq_client, llm_provider)
-        await rabbitmq_client.consume(message_handler.handle_generation_message)
-        logger.info("RabbitMQ consumer started")
-    else:
-        logger.warning("RabbitMQ not available, continuing without messaging")
+    llm_config = load_llm_config()
+    llm_provider = LLMProviderFactory.create(
+        llm_config.provider, llm_config.to_provider_config()
+    )
+    logger.info(f"Initialized LLM provider: {llm_config.provider}")
 
     yield
-
-    if rabbitmq_client:
-        await rabbitmq_client.close()
 
     logger.info("Shutting down Generation Pipeline")
 

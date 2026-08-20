@@ -10,15 +10,17 @@ const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().default('postgresql://paperless:paperless@localhost:5432/paperless_ai'),
   
-  // RabbitMQ
-  RABBITMQ_URL: z.string().default('amqp://localhost:5672'),
-  
   // JWT
   JWT_SECRET: z.string().min(32),
   
-  // Paperless-ngx
+  // Paperless-ngx (backward-compatible; superseded by DOCUMENT_PROVIDER_*)
   PAPERLESS_API_URL: z.string().url(),
   PAPERLESS_API_TOKEN: z.string(),
+
+  // Document source
+  DOCUMENT_PROVIDER: z.enum(['paperless', 'docspell']).default('paperless'),
+  DOCUMENT_PROVIDER_URL: z.string().optional(),
+  DOCUMENT_PROVIDER_TOKEN: z.string().optional(),
   
   // LLM Providers
   OPENAI_API_KEY: z.string().optional(),
@@ -34,6 +36,7 @@ const envSchema = z.object({
   CHROMA_URL: z.string().default('http://localhost:8000'),
   QDRANT_URL: z.string().optional(),
   QDRANT_API_KEY: z.string().optional(),
+  PGVECTOR_URL: z.string().optional(),
   
   // External API
   EXTERNAL_API_ENABLED: z.string().default('false'),

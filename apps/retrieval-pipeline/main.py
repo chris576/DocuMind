@@ -1,15 +1,14 @@
 import os
 import logging
-import requests
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from python_vectordb.config import load_vector_db_config
+
 from src.search_engine import SearchEngine
-from src.models import SearchRequest, SearchResult, ContextRequest, ContextResponse
-from src.messaging import RabbitMQClient
-from src.message_handlers import MessageHandler
+from src.models import SearchRequest, SearchResult, ContextRequest, ContextResponse, IndexBuildRequest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,20 +18,24 @@ logger = logging.getLogger("retrieval")
 
 # Global instance
 search_engine: SearchEngine = None
-rabbitmq_client: RabbitMQClient = None
-message_handler: MessageHandler = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global search_engine, rabbitmq_client, message_handler
+    global search_engine
 
     logger.info("Starting Retrieval Pipeline")
 
+    vector_db_config = load_vector_db_config()
     config = {
-        "chroma_url": os.getenv("CHROMA_URL", "http://localhost:8000"),
-        "collection_name": os.getenv("COLLECTION_NAME", "documents"),
-        "embedding_model": os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2"),
-        "cross_encoder_model": os.getenv("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+        "vector_db_type": vector_db_config.vector_db_type,
+        "chroma_url": vector_db_config.chroma_url,
+        "qdrant_url": vector_db_config.qdrant_url,
+        "qdrant_api_key": vector_db_config.qdrant_api_key,
+        "pgvector_url": vector_db_config.pgvector_url,
+        "collection_name": vector_db_config.collection_name,
+        "embedding_model": vector_db_config.embedding_model,
+        "embedding_provider": vector_db_config.embedding_provider,
+        "cross_encoder_model": vector_db_config.cross_encoder_model,
         "bm25_weight": float(os.getenv("BM25_WEIGHT", "0.3")),
         "semantic_weight": float(os.getenv("SEMANTIC_WEIGHT", "0.7")),
         "max_results": int(os.getenv("MAX_RESULTS", "20")),
@@ -41,28 +44,13 @@ async def lifespan(app: FastAPI):
 
     search_engine = SearchEngine(config)
     search_engine.initialize()
-    search_engine.setup_chroma()
+    search_engine.setup_vector_db()
 
     # Try to load BM25 index or build from documents
     if not search_engine._load_bm25():
         logger.info("No BM25 index found, will build when documents are available")
 
-    # Connect to RabbitMQ
-    rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
-    rabbitmq_client = RabbitMQClient(rabbitmq_url)
-    connected = await rabbitmq_client.connect("retrieval")
-
-    if connected:
-        message_handler = MessageHandler(rabbitmq_client, search_engine)
-        await rabbitmq_client.consume(message_handler.handle_retrieval_message)
-        logger.info("RabbitMQ consumer started")
-    else:
-        logger.warning("RabbitMQ not available, continuing without messaging")
-
     yield
-
-    if rabbitmq_client:
-        await rabbitmq_client.close()
 
     logger.info("Shutting down Retrieval Pipeline")
 
@@ -135,12 +123,21 @@ async def get_context(request: ContextRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/index/build")
-async def build_index():
-    """Trigger BM25 index rebuild - should be called after ingestion"""
+async def build_index(request: IndexBuildRequest):
+    """Rebuild the BM25 index from documents pushed by the ingestion pipeline."""
     try:
-        # In a real implementation, this would fetch documents from a shared cache
-        # or receive them via message queue from the ingestion pipeline
-        return {"status": "not_implemented", "message": "Index building from external source not yet implemented"}
+        if not request.documents:
+            return {"status": "completed", "documents_count": 0, "message": "No documents provided"}
+
+        success = search_engine.setup_bm25(request.documents)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to build BM25 index")
+
+        return {
+            "status": "completed",
+            "documents_count": len(request.documents),
+            "bm25_documents_count": search_engine.status.bm25_documents_count,
+        }
     except Exception as e:
         logger.error(f"Index build error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

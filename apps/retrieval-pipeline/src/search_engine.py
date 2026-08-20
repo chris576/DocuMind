@@ -1,17 +1,16 @@
 import os
 import logging
 import pickle
-import numpy as np
 from typing import List, Optional
 from datetime import datetime
 
-import chromadb
-from chromadb.utils import embedding_functions
-from sentence_transformers import SentenceTransformer, CrossEncoder
 from rank_bm25 import BM25Okapi
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
+
+from python_vectordb.reranking import Reranker, RerankerFactory
+from python_vectordb.vector_db import VectorDBFactory, SearchQuery, GetStatusQuery
 
 from .models import SearchRequest, SearchResult, SearchEngineStatus
 
@@ -24,47 +23,54 @@ nltk.download('stopwords', quiet=True)
 
 class SearchEngine:
     def __init__(self, config: dict):
+        self.vector_db_type = config.get("vector_db_type", "chroma")
         self.chroma_url = config.get("chroma_url", "http://localhost:8000")
+        self.qdrant_url = config.get("qdrant_url", "http://localhost:6333")
+        self.qdrant_api_key = config.get("qdrant_api_key")
+        self.pgvector_url = config.get("pgvector_url")
         self.collection_name = config.get("collection_name", "documents")
         self.embedding_model_name = config.get("embedding_model", "paraphrase-multilingual-MiniLM-L12-v2")
+        self.embedding_provider = config.get("embedding_provider", "sentence_transformer")
         self.cross_encoder_model_name = config.get("cross_encoder_model", "cross-encoder/ms-marco-MiniLM-L-6-v2")
         self.bm25_weight = config.get("bm25_weight", 0.3)
         self.semantic_weight = config.get("semantic_weight", 0.7)
         self.max_results = config.get("max_results", 20)
         self.bm25_file = config.get("bm25_file", "./data/bm25_index.pkl")
         
-        self.collection = None
+        self.vector_db = None
         self.bm25 = None
         self.tokenized_corpus = None
         self.documents = []
         self.is_initialized = False
         self.bm25_initialized = False
         
-        self.sentence_transformer: Optional[SentenceTransformer] = None
-        self.cross_encoder: Optional[CrossEncoder] = None
-        self.embedding_function = None
-        self.chroma_client = None
+        self.reranker: Optional[Reranker] = None
         
         self.status = SearchEngineStatus()
     
+    def _vector_db_config(self) -> dict:
+        db_type = self.vector_db_type.lower()
+        db_config = {
+            "type": db_type,
+            "collection": self.collection_name,
+            "embedding_model": self.embedding_model_name,
+            "embedding_provider": self.embedding_provider,
+        }
+        if db_type == "chroma":
+            db_config["url"] = self.chroma_url
+        elif db_type == "qdrant":
+            db_config["url"] = self.qdrant_url
+            db_config["api_key"] = self.qdrant_api_key
+        elif db_type == "pgvector":
+            db_config["url"] = self.pgvector_url
+        return db_config
+
     def initialize(self) -> bool:
         try:
-            if self.sentence_transformer is None:
-                logger.info("Initializing sentence transformer")
-                self.sentence_transformer = SentenceTransformer(self.embedding_model_name)
-            
-            if self.cross_encoder is None:
-                logger.info("Initializing cross-encoder")
-                self.cross_encoder = CrossEncoder(self.cross_encoder_model_name)
-            
-            if self.embedding_function is None:
-                self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-                    model_name=self.embedding_model_name
-                )
-            
-            if self.chroma_client is None:
-                self.chroma_client = chromadb.HttpClient(
-                    host=self.chroma_url.replace("http://", "").replace("https://", "")
+            if self.reranker is None:
+                logger.info("Initializing reranker")
+                self.reranker = RerankerFactory.create(
+                    {"reranker_provider": "cross_encoder", "cross_encoder_model": self.cross_encoder_model_name}
                 )
             
             self.is_initialized = True
@@ -77,27 +83,18 @@ class SearchEngine:
             self.status.initialized = False
             return False
     
-    def setup_chroma(self) -> bool:
+    def setup_vector_db(self) -> bool:
         try:
-            existing_collections = self.chroma_client.list_collections()
-            collection_exists = any(c.name == self.collection_name for c in existing_collections)
-            
-            if not collection_exists:
-                logger.warning(f"Collection '{self.collection_name}' does not exist")
-                return False
-            
-            self.collection = self.chroma_client.get_collection(
-                name=self.collection_name,
-                embedding_function=self.embedding_function
-            )
-            
-            count = self.collection.count()
-            logger.info(f"Loaded ChromaDB collection with {count} documents")
-            self.status.chroma_ready = True
-            self.status.documents_count = count
+            if self.vector_db is None:
+                self.vector_db = VectorDBFactory.create_reader(self._vector_db_config())
+
+            status = self.vector_db.ask(GetStatusQuery())
+            logger.info(f"Loaded vector database with {status.get('document_count', 0)} documents")
+            self.status.chroma_ready = status.get("ready", False)
+            self.status.documents_count = status.get("document_count", 0)
             return True
         except Exception as e:
-            logger.error(f"Error setting up ChromaDB: {str(e)}")
+            logger.error(f"Error setting up vector database: {str(e)}")
             self.status.chroma_ready = False
             return False
     
@@ -199,29 +196,24 @@ class SearchEngine:
         return results
     
     def semantic_search(self, query: str, top_k: int = None) -> List[dict]:
-        if not self.collection:
-            raise Exception("ChromaDB not initialized")
-        
+        if not self.vector_db:
+            raise Exception("Vector database not initialized")
+
         top_k = top_k or self.max_results
-        results = self.collection.query(query_texts=[query], n_results=min(top_k, 100))
-        
-        if not results or "ids" not in results or not results["ids"]:
-            return []
-        
+        results = self.vector_db.ask(SearchQuery(query=query, top_k=min(top_k, 100)))
+
         documents = []
-        for i, doc_id in enumerate(results["ids"][0]):
-            doc = next((d for d in self.documents if str(d["id"]) == doc_id), None)
-            if doc:
-                distance = results["distances"][0][i] if "distances" in results else 1.0
-                documents.append({
-                    "id": doc["id"],
-                    "title": doc["title"],
-                    "correspondent": doc.get("correspondent", ""),
-                    "date": doc.get("created", ""),
-                    "score": float(distance),
-                    "content": doc.get("content", "")
-                })
-        
+        for result in results:
+            metadata = result.metadata or {}
+            documents.append({
+                "id": result.id,
+                "title": result.title,
+                "correspondent": metadata.get("correspondent", ""),
+                "date": metadata.get("created", ""),
+                "score": float(result.score),
+                "content": result.content,
+            })
+
         return documents
     
     def hybrid_search(self, query: str, top_k: int = None) -> List[dict]:
@@ -249,11 +241,7 @@ class SearchEngine:
             max_keyword_score = max((r["score"] for r in keyword_results), default=1.0)
             for r in keyword_results:
                 r["score"] = r["score"] / max_keyword_score if max_keyword_score > 0 else 0
-        
-        if semantic_results:
-            for r in semantic_results:
-                r["score"] = 1 - r["score"] if r["score"] <= 1 else 0
-        
+
         for result in keyword_results:
             doc_id = result["id"]
             results_map[doc_id] = {
@@ -283,15 +271,9 @@ class SearchEngine:
         top_k = top_k or self.max_results
         
         try:
-            pairs = [(query, f"{r['title']} {r.get('content', '')[:500]}") for r in results]
-            cross_scores = self.cross_encoder.predict(pairs)
-            
-            for i, score in enumerate(cross_scores):
-                norm_score = 1.0 / (1.0 + np.exp(-score))
-                results[i]["cross_score"] = float(norm_score)
-            
-            results.sort(key=lambda x: x["cross_score"], reverse=True)
-            return results[:top_k]
+            if self.reranker is None:
+                raise Exception("Reranker not initialized")
+            return self.reranker.rerank(query, results, top_k)
         except Exception as e:
             logger.error(f"Error reranking: {str(e)}")
             for r in results:
@@ -378,6 +360,8 @@ class SearchEngine:
         return {
             "service": "retrieval-pipeline",
             "initialized": self.is_initialized,
+            "vector_db_type": self.vector_db_type,
+            "vector_db_ready": self.status.chroma_ready,
             "chroma_ready": self.status.chroma_ready,
             "bm25_ready": self.bm25_initialized,
             "documents_count": len(self.documents),

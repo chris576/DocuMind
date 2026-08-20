@@ -50,7 +50,7 @@ Powered by **Retrieval-Augmented Generation (RAG)**, you can now search semantic
 - NestJS 10 backend (`apps/backend`, port 3001)
 - Vite 6 + React 18 frontend (`apps/frontend`, port 3000)
 - Python pipelines (FastAPI): Ingestion (8001), Retrieval (8002), Generation (8003)
-- RabbitMQ messaging (topic exchange `paperless_ai`)
+- Direct HTTP REST communication between backend and pipelines (FastAPI)
 - Vector-DB factory: Chroma / Qdrant / PGVector
 - TypeScript 7 (native Go compiler) across the monorepo — the backend stays on TS 5.9 for NestJS toolchain compatibility
 
@@ -78,7 +78,6 @@ Services:
 | Retrieval pipeline | http://localhost:8002 |
 | Generation pipeline | http://localhost:8003 |
 | PostgreSQL | 5432 |
-| RabbitMQ (management) | 5672 / 15672 |
 | ChromaDB | 8000 |
 
 ### 🔧 Local Development

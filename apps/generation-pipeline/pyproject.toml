@@ -6,12 +6,9 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
-    "pydantic>=2.10.0",
-    "httpx>=0.28.0",
-    "aio-pika>=9.5.0",
-    "openai>=1.58.0",
-    "anthropic>=0.42.0",
     "python-dotenv>=1.0.0",
+    "python-common @ file:///../../packages/python-common",
+    "python-llm @ file:///../../packages/python-llm",
 ]
 
 [project.optional-dependencies]

@@ -1,3 +1,9 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:venv"
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/packages/python-common/src",
+        "${workspaceFolder}/packages/python-dms/src",
+        "${workspaceFolder}/packages/python-llm/src",
+        "${workspaceFolder}/packages/python-vectordb/src"
+    ]
 }

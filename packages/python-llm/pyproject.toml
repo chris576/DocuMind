@@ -1,0 +1,27 @@
+[project]
+name = "python-llm"
+version = "1.0.0"
+description = "LLM provider components for DMS-RAG"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.58.0",
+    "anthropic>=0.42.0",
+    "httpx>=0.28.0",
+    "pydantic>=2.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = [
+    "python_llm",
+]

@@ -28,6 +28,10 @@ class ContextResponse(BaseModel):
     sources: List[dict]
     query: str
 
+class IndexBuildRequest(BaseModel):
+    """Documents pushed by the ingestion pipeline to rebuild the BM25 index."""
+    documents: List[dict]
+
 class SearchEngineStatus(BaseModel):
     initialized: bool = False
     chroma_ready: bool = False

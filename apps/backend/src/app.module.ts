@@ -6,7 +6,6 @@ import { ChatModule } from './chat/chat.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ExternalApiModule } from './external-api/external-api.module';
 import { HealthModule } from './health/health.module';
-import { MessagingModule } from './messaging/messaging.module';
 
 @Module({
   imports: [
@@ -14,7 +13,6 @@ import { MessagingModule } from './messaging/messaging.module';
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
     }),
-    MessagingModule,
     AuthModule,
     RagModule,
     ChatModule,

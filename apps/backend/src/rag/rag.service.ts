@@ -2,7 +2,6 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import type { SearchRequestDto, AskQuestionDto } from '@paperless/shared';
-import { MessagingService, PipelineRoutingKey } from '../messaging/messaging.service';
 
 @Injectable()
 export class RagService {
@@ -11,7 +10,6 @@ export class RagService {
 
   constructor(
     private httpService: HttpService,
-    private messagingService: MessagingService,
   ) {}
 
   async search(dto: SearchRequestDto) {
@@ -80,13 +78,6 @@ export class RagService {
   }
 
   async startIndexing() {
-    // Publish async ingestion message via RabbitMQ
-    await this.messagingService.publish(PipelineRoutingKey.INGESTION, {
-      action: 'ingest',
-      check_new: true,
-    });
-
-    // Also trigger HTTP endpoint for immediate response
     try {
       const response = await firstValueFrom(
         this.httpService.post(`${process.env.INGESTION_PIPELINE_URL || 'http://localhost:8001'}/ingest`, {
@@ -94,19 +85,8 @@ export class RagService {
           check_new: true,
         }),
       );
-      return {
-        ...response.data,
-        rabbitmq: this.messagingService.isConnected(),
-      };
+      return response.data;
     } catch (error) {
-      // If HTTP fails but RabbitMQ is connected, still report success via queue
-      if (this.messagingService.isConnected()) {
-        return {
-          status: 'queued',
-          message: 'Indexing queued via RabbitMQ',
-          rabbitmq: true,
-        };
-      }
       throw new HttpException(
         'Failed to start indexing',
         HttpStatus.INTERNAL_SERVER_ERROR,
