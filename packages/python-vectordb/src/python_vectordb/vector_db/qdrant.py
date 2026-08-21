@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -11,7 +11,7 @@ from .base import BaseVectorDB, VectorDBDocument, VectorDBSearchResult
 logger = logging.getLogger("python_vectordb.vector_db.qdrant")
 
 
-def _to_point_id(doc_id: str) -> Union[int, str, uuid.UUID]:
+def _to_point_id(doc_id: str) -> int | str | uuid.UUID:
     """Convert a document id to a Qdrant-compatible point id.
 
     Qdrant accepts unsigned integers or UUID strings. Numeric ids (e.g. Paperless
@@ -121,6 +121,18 @@ class QdrantVectorDB(BaseVectorDB):
             raise Exception("Qdrant not initialized")
         self.client.delete_collection(self.collection_name)
         self.ready = False
+
+    def delete_documents(self, document_ids: List[str]) -> None:
+        if not self.ready or not self.client:
+            raise Exception("Qdrant not initialized")
+        if not document_ids:
+            return
+        point_ids = [_to_point_id(doc_id) for doc_id in document_ids]
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=models.PointIdsList(points=point_ids),
+        )
+        logger.info(f"Deleted {len(document_ids)} documents from Qdrant")
 
     def get_status(self) -> Dict[str, Any]:
         if not self.ready or not self.client:

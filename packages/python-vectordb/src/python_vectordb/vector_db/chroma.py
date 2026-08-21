@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any, Dict, List
 
@@ -55,7 +56,10 @@ class ChromaVectorDB(BaseVectorDB):
             batch = documents[i : i + batch_size]
             ids = [doc.id for doc in batch]
             texts = [f"{doc.title} {doc.content}" for doc in batch]
-            metadatas = [{"title": doc.title, **doc.metadata} for doc in batch]
+            metadatas = [
+                {"title": doc.title, **self._flatten_metadata(doc.metadata)}
+                for doc in batch
+            ]
             embeddings = self.embedding_provider.encode_texts(texts)
 
             self.collection.upsert(
@@ -101,6 +105,30 @@ class ChromaVectorDB(BaseVectorDB):
             raise Exception("ChromaDB not initialized")
         self.client.delete_collection(self.collection_name)
         self.ready = False
+
+    def delete_documents(self, document_ids: List[str]) -> None:
+        if not self.ready or not self.collection:
+            raise Exception("ChromaDB not initialized")
+        if not document_ids:
+            return
+        self.collection.delete(ids=document_ids)
+        logger.info(f"Deleted {len(document_ids)} documents from ChromaDB")
+
+    @staticmethod
+    def _flatten_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Flatten non-scalar metadata values to JSON strings.
+
+        Chroma requires flat, scalar metadata values (no nested dicts or
+        lists). Values that are lists or dicts (e.g. document links, custom
+        field objects) are serialized to JSON so they remain filterable.
+        """
+        flattened: Dict[str, Any] = {}
+        for key, value in metadata.items():
+            if isinstance(value, (list, dict)):
+                flattened[key] = json.dumps(value, ensure_ascii=False)
+            else:
+                flattened[key] = value
+        return flattened
 
     def get_status(self) -> Dict[str, Any]:
         if not self.ready or not self.collection:

@@ -19,3 +19,10 @@ class IndexDocumentsCommand:
 @dataclass
 class DeleteCollectionCommand:
     """Delete the entire collection."""
+
+
+@dataclass
+class DeleteDocumentsCommand:
+    """Delete individual documents from the vector database by id."""
+
+    document_ids: List[str] = field(default_factory=list)

@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, List
 
-from .base import DocumentProvider, SourceDocument
+from .base import DocumentProvider, DocumentSummary, SourceDocument
 
 logger = logging.getLogger("python_dms.docspell")
 
@@ -15,6 +15,7 @@ class DocspellDocumentProvider(DocumentProvider):
     """
 
     def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
         self.base_url = config.get("url") or config.get("document_provider_url")
         self.token = config.get("token") or config.get("document_provider_token")
 
@@ -28,4 +29,7 @@ class DocspellDocumentProvider(DocumentProvider):
         raise NotImplementedError("Docspell document provider is not implemented yet")
 
     def fetch_document_content(self, doc_id: str) -> str:
+        raise NotImplementedError("Docspell document provider is not implemented yet")
+
+    def fetch_document_summaries(self) -> List[DocumentSummary]:
         raise NotImplementedError("Docspell document provider is not implemented yet")

@@ -123,6 +123,19 @@ class PgVectorVectorDB(BaseVectorDB):
         self.connection.commit()
         self.ready = False
 
+    def delete_documents(self, document_ids: List[str]) -> None:
+        if not self.ready or not self.connection:
+            raise Exception("PGVector not initialized")
+        if not document_ids:
+            return
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                f"DELETE FROM {self.table_name} WHERE id = ANY(%s)",
+                (document_ids,),
+            )
+        self.connection.commit()
+        logger.info(f"Deleted {len(document_ids)} documents from PGVector")
+
     def get_status(self) -> Dict[str, Any]:
         if not self.ready or not self.connection:
             return {"ready": False, "document_count": 0}

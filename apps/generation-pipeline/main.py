@@ -1,15 +1,20 @@
-import os
 import logging
+import os
 import uuid
-from typing import Dict
 from contextlib import asynccontextmanager
+from typing import Dict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-
-from python_llm import LLMProviderFactory, BaseLLMProvider, GenerateRequest, GenerateResponse, ChatMessage
+from python_llm import (
+    BaseLLMProvider,
+    ChatMessage,
+    GenerateRequest,
+    GenerateResponse,
+    LLMProviderFactory,
+)
 from python_llm.config import load_llm_config
 
 from src.models import ChatInitRequest, ChatMessageRequest
@@ -86,7 +91,7 @@ async def generate(request: GenerateRequest):
         return response
     except Exception as e:
         logger.error(f"Generation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.post("/generate/stream")
 async def generate_stream(request: GenerateRequest):
@@ -151,7 +156,7 @@ async def chat_message(request: ChatMessageRequest):
         }
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.post("/chat/message/stream")
 async def chat_message_stream(request: ChatMessageRequest):

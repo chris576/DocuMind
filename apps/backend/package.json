@@ -12,6 +12,8 @@
     "start": "nest start",
     "start:prod": "node dist/main",
     "lint": "eslint src/",
+    "test": "vitest run --coverage",
+    "test:unit": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -49,6 +51,7 @@
     "@types/bcryptjs": "^2.4.6",
     "typescript": "^5.9.3",
     "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0"
+    "tsconfig-paths": "^4.2.0",
+    "vitest": "^4.1.11"
   }
 }

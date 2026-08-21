@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 @dataclass
@@ -16,10 +16,10 @@ class VectorDBConfig:
     collection_name: str
     embedding_model: str
     cross_encoder_model: str
-    chroma_url: Optional[str] = None
-    qdrant_url: Optional[str] = None
-    qdrant_api_key: Optional[str] = None
-    pgvector_url: Optional[str] = None
+    chroma_url: str | None = None
+    qdrant_url: str | None = None
+    qdrant_api_key: str | None = None
+    pgvector_url: str | None = None
 
     def to_vector_db_config(self) -> Dict[str, Any]:
         """Build the dict expected by VectorDBFactory (delegates embedding)."""

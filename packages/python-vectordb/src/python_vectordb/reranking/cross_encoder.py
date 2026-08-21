@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from sentence_transformers import CrossEncoder
 
@@ -18,7 +18,7 @@ class CrossEncoderReranker(Reranker):
         logger.info(f"Loaded cross-encoder model: {model_name}")
 
     def rerank(
-        self, query: str, candidates: List[Dict[str, Any]], top_k: Optional[int] = None
+        self, query: str, candidates: List[Dict[str, Any]], top_k: int | None = None
     ) -> List[Dict[str, Any]]:
         if not candidates:
             return []

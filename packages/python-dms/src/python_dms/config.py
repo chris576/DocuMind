@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 @dataclass
@@ -11,8 +11,8 @@ class DMSConfig:
     """
 
     document_provider: str
-    document_provider_url: Optional[str] = None
-    document_provider_token: Optional[str] = None
+    document_provider_url: str | None = None
+    document_provider_token: str | None = None
 
     def to_document_provider_config(self) -> Dict[str, Any]:
         """Build the dict expected by DocumentProviderFactory."""

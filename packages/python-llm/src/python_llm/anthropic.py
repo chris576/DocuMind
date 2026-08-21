@@ -1,5 +1,6 @@
 import logging
-from typing import AsyncGenerator, List
+from collections.abc import AsyncGenerator
+from typing import List
 
 import anthropic
 

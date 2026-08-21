@@ -25,6 +25,11 @@ class VectorDBWriter(ABC):
         """Delete the entire collection."""
         pass
 
+    @abstractmethod
+    def delete_documents(self, document_ids: List[str]) -> None:
+        """Delete individual documents by id."""
+        pass
+
 
 class VectorDBReader(ABC):
     """Read-only port for the vector database (used by the retrieval pipeline)."""

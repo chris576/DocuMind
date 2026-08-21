@@ -1,14 +1,19 @@
-import os
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
 from python_vectordb.config import load_vector_db_config
 
+from src.models import (
+    ContextRequest,
+    ContextResponse,
+    IndexBuildRequest,
+    SearchRequest,
+    SearchResult,
+)
 from src.search_engine import SearchEngine
-from src.models import SearchRequest, SearchResult, ContextRequest, ContextResponse, IndexBuildRequest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,7 +94,7 @@ async def search(request: SearchRequest):
         return results
     except Exception as e:
         logger.error(f"Search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.post("/context", response_model=ContextResponse)
 async def get_context(request: ContextRequest):
@@ -120,7 +125,7 @@ async def get_context(request: ContextRequest):
         )
     except Exception as e:
         logger.error(f"Context error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.post("/index/build")
 async def build_index(request: IndexBuildRequest):
@@ -140,7 +145,7 @@ async def build_index(request: IndexBuildRequest):
         }
     except Exception as e:
         logger.error(f"Index build error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 if __name__ == "__main__":
     import uvicorn

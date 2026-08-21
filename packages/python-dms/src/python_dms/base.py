@@ -20,10 +20,27 @@ class SourceDocument:
     title: str
     content: str
     correspondent: str = ""
+    document_type: str = ""
+    storage_path: str = ""
     created: str = ""
     tags: List[str] = field(default_factory=list)
     last_updated: str = ""
     hash: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class DocumentSummary:
+    """Lightweight document metadata used for change detection.
+
+    Carries only the fields needed to detect new/changed/deleted documents
+    (id + content checksum + last-modified timestamp) so polling does not need
+    to transfer full document content.
+    """
+
+    id: str
+    checksum: str = ""
+    modified: str = ""
 
 
 class DocumentProvider(ABC):
@@ -33,6 +50,15 @@ class DocumentProvider(ABC):
     configuration and injected into the ingestion service. Consumers never
     depend on a concrete document API.
     """
+
+    def __init__(self, config: Dict[str, Any]) -> None:
+        """Store the provider configuration.
+
+        Concrete subclasses read the fields they need from ``config`` (url,
+        token, ...). Declaring the constructor here lets the factory instantiate
+        any registered provider through the base type.
+        """
+        self._config = config
 
     @staticmethod
     def compute_hash(doc: Dict[str, Any]) -> str:
@@ -47,6 +73,11 @@ class DocumentProvider(ABC):
     @abstractmethod
     def fetch_documents(self) -> List[SourceDocument]:
         """Fetch and normalize all documents from the source."""
+        pass
+
+    @abstractmethod
+    def fetch_document_summaries(self) -> List[DocumentSummary]:
+        """Fetch lightweight summaries (id, checksum, modified) for change detection."""
         pass
 
     @abstractmethod

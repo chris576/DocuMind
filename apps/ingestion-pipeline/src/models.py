@@ -1,6 +1,7 @@
+from typing import List
+
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime
+
 
 class DocumentMetadata(BaseModel):
     title: str
@@ -21,7 +22,7 @@ class Document(BaseModel):
 
 class IngestionStatus(BaseModel):
     running: bool = False
-    last_indexed: Optional[str] = None
+    last_indexed: str | None = None
     documents_count: int = 0
     up_to_date: bool = False
     message: str = ""

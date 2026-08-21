@@ -1,12 +1,12 @@
 import logging
-from typing import List, Optional, Tuple
 from datetime import datetime
+from typing import List, Tuple
 
 from python_dms import DocumentProvider, SourceDocument
 from python_vectordb.vector_db import (
-    VectorDBCommandBus,
-    InitializeCommand,
     IndexDocumentsCommand,
+    InitializeCommand,
+    VectorDBCommandBus,
     VectorDBDocument,
 )
 

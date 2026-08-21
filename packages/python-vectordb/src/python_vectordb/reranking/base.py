@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 class Reranker(ABC):
@@ -11,7 +11,7 @@ class Reranker(ABC):
 
     @abstractmethod
     def rerank(
-        self, query: str, candidates: List[Dict[str, Any]], top_k: Optional[int] = None
+        self, query: str, candidates: List[Dict[str, Any]], top_k: int | None = None
     ) -> List[Dict[str, Any]]:
         """Rerank candidate documents and return the top_k, sorted by cross score.
 

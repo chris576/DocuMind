@@ -1,7 +1,8 @@
-from typing import Any, Optional
+from typing import Any
 
 from .commands import (
     DeleteCollectionCommand,
+    DeleteDocumentsCommand,
     IndexDocumentsCommand,
     InitializeCommand,
 )
@@ -41,8 +42,8 @@ class VectorDBCommandBus:
 
     def __init__(
         self,
-        writer: Optional[VectorDBWriter] = None,
-        reader: Optional[VectorDBReader] = None,
+        writer: VectorDBWriter | None = None,
+        reader: VectorDBReader | None = None,
     ):
         self._writer = writer
         self._reader = reader
@@ -59,6 +60,8 @@ class VectorDBCommandBus:
             return self._writer.add_documents(command.documents)
         if isinstance(command, DeleteCollectionCommand):
             return self._writer.delete_collection()
+        if isinstance(command, DeleteDocumentsCommand):
+            return self._writer.delete_documents(command.document_ids)
         raise UnknownCommandError(f"Unsupported command: {type(command).__name__}")
 
     def ask(self, query: Any) -> Any:

@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 @dataclass
@@ -12,12 +12,12 @@ class LLMConfig:
 
     provider: str
     model: str
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-    custom_base_url: Optional[str] = None
-    custom_api_key: Optional[str] = None
-    custom_model: Optional[str] = None
+    api_key: str | None = None
+    base_url: str | None = None
+    anthropic_api_key: str | None = None
+    custom_base_url: str | None = None
+    custom_api_key: str | None = None
+    custom_model: str | None = None
 
     def to_provider_config(self) -> Dict[str, Any]:
         """Build the dict expected by LLMProviderFactory.create().

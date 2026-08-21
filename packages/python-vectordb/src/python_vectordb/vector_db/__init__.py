@@ -9,6 +9,7 @@ from .bus import (
 from .chroma import ChromaVectorDB
 from .commands import (
     DeleteCollectionCommand,
+    DeleteDocumentsCommand,
     IndexDocumentsCommand,
     InitializeCommand,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "InitializeCommand",
     "IndexDocumentsCommand",
     "DeleteCollectionCommand",
+    "DeleteDocumentsCommand",
     "SearchQuery",
     "GetStatusQuery",
     "ChromaVectorDB",

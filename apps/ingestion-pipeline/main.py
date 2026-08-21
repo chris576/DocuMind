@@ -1,21 +1,20 @@
-import os
 import logging
+import os
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import BackgroundTasks, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from python_common.env import get_env
 from python_common.http import post_json
-from python_dms.config import load_dms_config
 from python_dms import DocumentProviderFactory
+from python_dms.config import load_dms_config
 from python_vectordb.config import load_vector_db_config
 from python_vectordb.vector_db import VectorDBFactory
 
 from src.ingestion_service import IngestionService
-from src.tasks import IngestionTask
 from src.models import IngestionRequest
+from src.tasks import IngestionTask
 
 logging.basicConfig(
     level=logging.INFO,

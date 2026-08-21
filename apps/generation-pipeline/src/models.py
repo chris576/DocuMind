@@ -1,7 +1,7 @@
-from pydantic import BaseModel
-from typing import Optional, List
 from enum import Enum
+from typing import List
 
+from pydantic import BaseModel
 from python_llm import ChatMessage
 
 
@@ -13,9 +13,9 @@ class LLMProviderType(str, Enum):
 
 
 class ChatInitRequest(BaseModel):
-    document_id: Optional[int] = None
-    document_title: Optional[str] = None
-    document_content: Optional[str] = None
+    document_id: int | None = None
+    document_title: str | None = None
+    document_content: str | None = None
 
 
 class ChatMessageRequest(BaseModel):

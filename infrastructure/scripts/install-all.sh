@@ -82,16 +82,27 @@ PIP="$VENV_DIR/bin/pip"
 # pip aktualisieren
 "$PIP" install -q --upgrade pip
 
-# Gemeinsames Paket (bringt alle ML-Deps mit: sentence-transformers,
-# chromadb, qdrant-client, psycopg2, rank-bm25, nltk, openai, anthropic, ...)
-info "Installiere python-shared (ML-Abhängigkeiten) ..."
-"$PIP" install -q -e "$REPO_ROOT/packages/python-shared"
-ok "python-shared installiert."
+# Fach-Pakete (editable installiert): bringen alle ML-/Runtime-Deps mit
+# (sentence-transformers, chromadb, qdrant-client, psycopg2, rank-bm25, nltk,
+# openai, anthropic, pydantic, requests, httpx, aio-pika, ...)
+info "Installiere Python-Fach-Pakete (python-common, python-dms, python-llm, python-vectordb) ..."
+"$PIP" install -q \
+  -e "$REPO_ROOT/packages/python-common" \
+  -e "$REPO_ROOT/packages/python-dms" \
+  -e "$REPO_ROOT/packages/python-llm" \
+  -e "$REPO_ROOT/packages/python-vectordb"
+ok "Python-Fach-Pakete installiert."
 
 # Pipeline-Runtime-Deps (fastapi/uvicorn/dotenv) — identisch in allen 3 Pipelines
-info "Installiere Pipeline-Runtime-Deps (fastapi, uvicorn, python-dotenv) ..."
-"$PIP" install -q "fastapi>=0.115.0" "uvicorn>=0.32.0" "python-dotenv>=1.0.0"
+# + Retrieval-Extras (rank-bm25, nltk)
+info "Installiere Pipeline-Runtime-Deps (fastapi, uvicorn, python-dotenv, rank-bm25, nltk) ..."
+"$PIP" install -q "fastapi>=0.115.0" "uvicorn>=0.32.0" "python-dotenv>=1.0.0" "rank-bm25>=0.2.2" "nltk>=3.9.0"
 ok "Pipeline-Runtime-Deps installiert."
+
+# Test-/Analyse-Tools (Test-Harness): pytest-cov, coverage, mypy, bandit, ruff
+info "Installiere Test-/Analyse-Tools (pytest-cov, coverage, mypy, bandit) + Testcontainers ..."
+"$PIP" install -q "pytest-cov>=5.0.0" "coverage>=7.6.0" "mypy>=1.11.0" "bandit>=1.7.9" "testcontainers>=4.8.0"
+ok "Test-/Analyse-Tools installiert."
 
 # ----------------------------------------------------------------------------
 # Abschluss

@@ -12,6 +12,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint src/",
+    "test": "vitest run --coverage",
+    "test:unit": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
