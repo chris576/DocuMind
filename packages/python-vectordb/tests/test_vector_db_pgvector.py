@@ -182,3 +182,58 @@ def test_get_status_exception(mock_connect):
     adapter.ready = True
     adapter.connection = conn
     assert adapter.get_status() == {"ready": False, "document_count": 0}
+
+
+def test_default_metric_is_cosine():
+    assert _adapter().similarity_metric == "cosine"
+    assert _adapter().operator == "<=>"
+
+
+@pytest.mark.parametrize(
+    "metric,operator",
+    [
+        ("cosine", "<=>"),
+        ("euclidean", "<->"),
+        ("dot", "<#>"),
+    ],
+)
+def test_metric_selects_operator(metric, operator):
+    adapter = _adapter(similarity_metric=metric)
+    assert adapter.similarity_metric == metric
+    assert adapter.operator == operator
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_search_uses_selected_operator(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchall.return_value = []
+    mock_connect.return_value = conn
+
+    adapter = _adapter(similarity_metric="euclidean")
+    adapter.ready = True
+    adapter.connection = conn
+
+    adapter.search("q")
+    sql = cursor.execute.call_args.args[0]
+    assert "<->" in sql
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_search_normalizes_euclidean_score(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchall.return_value = [
+        ("1", "t1", "c1", {"k": "v"}, 5.0),
+    ]
+    mock_connect.return_value = conn
+
+    adapter = _adapter(similarity_metric="euclidean")
+    adapter.ready = True
+    adapter.connection = conn
+
+    results = adapter.search("q")
+    # Euclidean raw distance 5.0 -> 1/(1+5) = 1/6.
+    assert abs(results[0].score - 1.0 / 6.0) < 1e-9

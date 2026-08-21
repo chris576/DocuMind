@@ -6,6 +6,7 @@ import chromadb
 
 from ..embeddings import EmbeddingProvider
 from .base import BaseVectorDB, VectorDBDocument, VectorDBSearchResult
+from .metrics import CHROMA_SPACES
 
 logger = logging.getLogger("python_vectordb.vector_db.chroma")
 
@@ -15,6 +16,8 @@ class ChromaVectorDB(BaseVectorDB):
         self.url = config.get("url", "http://localhost:8000")
         self.collection_name = config.get("collection", "documents")
         self.embedding_provider = embedding_provider
+        self.similarity_metric = config.get("similarity_metric", "cosine").lower()
+        self.space = CHROMA_SPACES[self.similarity_metric]
         self.client = None
         self.collection = None
         self.ready = False
@@ -36,7 +39,7 @@ class ChromaVectorDB(BaseVectorDB):
             else:
                 self.collection = self.client.create_collection(
                     name=self.collection_name,
-                    metadata={"hnsw:space": "cosine"},
+                    metadata={"hnsw:space": self.space},
                 )
 
             self.ready = True

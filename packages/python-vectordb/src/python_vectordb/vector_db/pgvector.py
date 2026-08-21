@@ -6,6 +6,7 @@ import psycopg2.extras
 
 from ..embeddings import EmbeddingProvider
 from .base import BaseVectorDB, VectorDBDocument, VectorDBSearchResult
+from .metrics import PGVECTOR_OPERATORS, normalize_pgvector_score
 
 logger = logging.getLogger("python_vectordb.vector_db.pgvector")
 
@@ -17,6 +18,8 @@ class PgVectorVectorDB(BaseVectorDB):
         self.table_name = config.get("collection", "documents")
         self.embedding_provider = embedding_provider
         self.embedding_dimension = config.get("embedding_dimension", 384)
+        self.similarity_metric = config.get("similarity_metric", "cosine").lower()
+        self.operator = PGVECTOR_OPERATORS[self.similarity_metric]
         self.connection = None
         self.ready = False
 
@@ -92,9 +95,9 @@ class PgVectorVectorDB(BaseVectorDB):
             cursor.execute(
                 f"""
                 SELECT id, title, content, metadata,
-                       1 - (embedding <=> %s::vector) AS score
+                       1 - (embedding {self.operator} %s::vector) AS score
                 FROM {self.table_name}
-                ORDER BY embedding <=> %s::vector
+                ORDER BY embedding {self.operator} %s::vector
                 LIMIT %s
                 """,
                 (query_vector, query_vector, top_k),
@@ -103,13 +106,18 @@ class PgVectorVectorDB(BaseVectorDB):
 
         documents = []
         for row in rows:
-            doc_id, title, content, metadata, score = row
+            doc_id, title, content, metadata, raw_score = row
+            score = (
+                normalize_pgvector_score(self.similarity_metric, float(raw_score))
+                if raw_score is not None
+                else 0.0
+            )
             documents.append(
                 VectorDBSearchResult(
                     id=str(doc_id),
                     title=title,
                     content=content,
-                    score=float(score) if score is not None else 0.0,
+                    score=score,
                     metadata=metadata or {},
                 )
             )

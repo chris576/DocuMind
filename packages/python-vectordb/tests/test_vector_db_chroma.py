@@ -55,6 +55,38 @@ def test_initialize_failure_returns_false(mock_client_cls):
     assert adapter.ready is False
 
 
+def test_default_metric_is_cosine():
+    adapter = _adapter()
+    assert adapter.similarity_metric == "cosine"
+    assert adapter.space == "cosine"
+
+
+@pytest.mark.parametrize(
+    "metric,space",
+    [
+        ("cosine", "cosine"),
+        ("euclidean", "l2"),
+        ("dot", "ip"),
+    ],
+)
+def test_metric_selects_space(metric, space):
+    adapter = _adapter(similarity_metric=metric)
+    assert adapter.space == space
+
+
+@patch("python_vectordb.vector_db.chroma.chromadb.HttpClient")
+def test_initialize_uses_configured_space(mock_client_cls):
+    client = MagicMock()
+    client.list_collections.return_value = []
+    mock_client_cls.return_value = client
+
+    adapter = _adapter(similarity_metric="euclidean")
+    assert adapter.initialize() is True
+    client.create_collection.assert_called_once_with(
+        name="docs", metadata={"hnsw:space": "l2"}
+    )
+
+
 def test_add_documents_requires_ready():
     adapter = _adapter()
     with pytest.raises(Exception, match="not initialized"):

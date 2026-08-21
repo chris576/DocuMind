@@ -7,6 +7,7 @@ from qdrant_client.http import models
 
 from ..embeddings import EmbeddingProvider
 from .base import BaseVectorDB, VectorDBDocument, VectorDBSearchResult
+from .metrics import QDRANT_DISTANCES
 
 logger = logging.getLogger("python_vectordb.vector_db.qdrant")
 
@@ -39,6 +40,8 @@ class QdrantVectorDB(BaseVectorDB):
         self.collection_name = config.get("collection", "documents")
         self.embedding_provider = embedding_provider
         self.embedding_dimension = config.get("embedding_dimension", 384)
+        self.similarity_metric = config.get("similarity_metric", "cosine").lower()
+        self.distance = models.Distance[QDRANT_DISTANCES[self.similarity_metric]]
         self.client = None
         self.ready = False
 
@@ -56,7 +59,7 @@ class QdrantVectorDB(BaseVectorDB):
                     collection_name=self.collection_name,
                     vectors_config=models.VectorParams(
                         size=self.embedding_dimension,
-                        distance=models.Distance.COSINE,
+                        distance=self.distance,
                     ),
                 )
 

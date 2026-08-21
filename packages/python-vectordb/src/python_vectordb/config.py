@@ -16,6 +16,7 @@ class VectorDBConfig:
     collection_name: str
     embedding_model: str
     cross_encoder_model: str
+    similarity_metric: str = "cosine"
     chroma_url: str | None = None
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None
@@ -29,6 +30,7 @@ class VectorDBConfig:
             "collection": self.collection_name,
             "embedding_model": self.embedding_model,
             "embedding_provider": self.embedding_provider,
+            "similarity_metric": self.similarity_metric,
         }
         if db_type == "chroma":
             db_config["url"] = self.chroma_url or "http://localhost:8000"
@@ -67,6 +69,7 @@ def load_vector_db_config() -> VectorDBConfig:
         cross_encoder_model=os.getenv(
             "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
         ),
+        similarity_metric=os.getenv("SIMILARITY_METRIC", "cosine"),
         chroma_url=os.getenv("CHROMA_URL", "http://localhost:8000"),
         qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
         qdrant_api_key=os.getenv("QDRANT_API_KEY"),

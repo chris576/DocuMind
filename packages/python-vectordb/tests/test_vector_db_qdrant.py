@@ -2,6 +2,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from qdrant_client.http import models
 
 from python_vectordb.vector_db.base import VectorDBDocument
 from python_vectordb.vector_db.qdrant import QdrantVectorDB, _to_point_id
@@ -171,3 +172,35 @@ def test_to_point_id():
     mapped = _to_point_id("abc-123")
     assert isinstance(mapped, str) or hasattr(mapped, "hex")
     assert str(mapped) != ""
+
+
+def test_default_metric_is_cosine():
+    adapter = _adapter()
+    assert adapter.similarity_metric == "cosine"
+    assert adapter.distance == models.Distance.COSINE
+
+
+@pytest.mark.parametrize(
+    "metric,distance",
+    [
+        ("cosine", models.Distance.COSINE),
+        ("euclidean", models.Distance.EUCLID),
+        ("dot", models.Distance.DOT),
+        ("manhattan", models.Distance.MANHATTAN),
+    ],
+)
+def test_metric_selects_distance(metric, distance):
+    adapter = _adapter(similarity_metric=metric)
+    assert adapter.distance == distance
+
+
+@patch("python_vectordb.vector_db.qdrant.QdrantClient")
+def test_initialize_uses_configured_distance(mock_client_cls):
+    client = MagicMock()
+    client.get_collections.return_value = MagicMock(collections=[])
+    mock_client_cls.return_value = client
+
+    adapter = _adapter(similarity_metric="euclidean")
+    assert adapter.initialize() is True
+    created = client.create_collection.call_args.kwargs["vectors_config"]
+    assert created.distance == models.Distance.EUCLID

@@ -17,6 +17,7 @@ def test_vector_db_config_chroma():
         "collection": "docs",
         "embedding_model": "m1",
         "embedding_provider": "sentence_transformer",
+        "similarity_metric": "cosine",
         "url": "http://localhost:8000",
     }
     assert cfg.to_embedding_config() == {
@@ -44,6 +45,7 @@ def test_vector_db_config_qdrant():
     assert conf["type"] == "qdrant"
     assert conf["url"] == "http://qdrant:6333"
     assert conf["api_key"] == "key"
+    assert conf["similarity_metric"] == "cosine"
 
 
 def test_vector_db_config_pgvector():
@@ -69,6 +71,7 @@ def test_load_vector_db_config_defaults(monkeypatch):
         "COLLECTION_NAME",
         "EMBEDDING_MODEL",
         "CROSS_ENCODER_MODEL",
+        "SIMILARITY_METRIC",
         "CHROMA_URL",
         "QDRANT_URL",
         "QDRANT_API_KEY",
@@ -79,6 +82,7 @@ def test_load_vector_db_config_defaults(monkeypatch):
     cfg = load_vector_db_config()
     assert cfg.vector_db_type == "chroma"
     assert cfg.collection_name == "documents"
+    assert cfg.similarity_metric == "cosine"
     assert cfg.chroma_url == "http://localhost:8000"
     assert cfg.qdrant_url == "http://localhost:6333"
     assert cfg.qdrant_api_key is None
@@ -94,3 +98,10 @@ def test_load_vector_db_config_from_env(monkeypatch):
     assert cfg.vector_db_type == "qdrant"
     assert cfg.qdrant_url == "http://custom:6333"
     assert cfg.qdrant_api_key == "abc"
+
+
+def test_load_vector_db_config_similarity_metric_env(monkeypatch):
+    monkeypatch.setenv("SIMILARITY_METRIC", "euclidean")
+    cfg = load_vector_db_config()
+    assert cfg.similarity_metric == "euclidean"
+    assert cfg.to_vector_db_config()["similarity_metric"] == "euclidean"
