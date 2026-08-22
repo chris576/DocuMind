@@ -10,6 +10,7 @@ class SearchRequest(BaseModel):
     correspondent: str | None = None
     max_results: int = 20
 
+
 class SearchResult(BaseModel):
     title: str
     correspondent: str = ""
@@ -20,18 +21,23 @@ class SearchResult(BaseModel):
     doc_id: int | None = None
     content: str = ""
 
+
 class ContextRequest(BaseModel):
     question: str
     max_sources: int = 5
+
 
 class ContextResponse(BaseModel):
     context: str
     sources: List[dict]
     query: str
 
+
 class IndexBuildRequest(BaseModel):
     """Documents pushed by the ingestion pipeline to rebuild the BM25 index."""
+
     documents: List[dict]
+
 
 class SearchEngineStatus(BaseModel):
     initialized: bool = False

@@ -9,8 +9,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "python-common @ file:///../../packages/python-common",
     "python-vectordb @ file:///../../packages/python-vectordb",
-    "rank-bm25>=0.2.2",
-    "nltk>=3.9.0",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +25,7 @@ testpaths = ["tests"]
 addopts = "--cov --cov-report=term-missing --cov-fail-under=75"
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "main"]
 
 # Clean-Code-Linting: Fehler (E/F), Bugbear (B), Komplexität (C90),
 # Pylint-Idiome (PL), Vereinfachung (SIM). Bewusste Ausnahmen für Bestands-
@@ -63,6 +61,14 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_return_any = true
+# Lokale Utility-Packages sind bewusst untypisiert (kein py.typed).
+# Mypy überspringt sie statt sie zu analysieren.
+ignore_missing_imports = true
 
 [tool.bandit]
 exclude_dirs = ["tests"]
+skips = [
+    "B104",  # host="0.0.0.0": bewusste FastAPI/Docker-Bindung
+    "B301",  # pickle.load: BM25-Cache ist eine lokale, vom Pipeline selbst
+    "B403",  # jegeschriebene Datei (kein untrusted Input) — bewusste Wahl
+]

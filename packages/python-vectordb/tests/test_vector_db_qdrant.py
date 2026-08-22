@@ -25,12 +25,16 @@ def _adapter(**kwargs):
 def test_initialize_creates_collection(mock_client_cls):
     client = MagicMock()
     client.get_collections.return_value = MagicMock(collections=[])
+    info = MagicMock()
+    info.payload_schema = {}
+    client.get_collection.return_value = info
     mock_client_cls.return_value = client
 
     adapter = _adapter()
     assert adapter.initialize() is True
     client.create_collection.assert_called_once()
-    client.get_collection.assert_not_called()
+    # get_collection is used to inspect existing fulltext indexes.
+    assert client.get_collection.call_count >= 1
 
 
 @patch("python_vectordb.vector_db.qdrant.QdrantClient")
@@ -204,3 +208,90 @@ def test_initialize_uses_configured_distance(mock_client_cls):
     assert adapter.initialize() is True
     created = client.create_collection.call_args.kwargs["vectors_config"]
     assert created.distance == models.Distance.EUCLID
+
+
+@patch("python_vectordb.vector_db.qdrant.QdrantClient")
+def test_initialize_creates_fulltext_indexes(mock_client_cls):
+    client = MagicMock()
+    client.get_collections.return_value = MagicMock(collections=[])
+    info = MagicMock()
+    info.payload_schema = {}
+    client.get_collection.return_value = info
+    mock_client_cls.return_value = client
+
+    adapter = _adapter()
+    assert adapter.initialize() is True
+    # Fulltext indexes requested for title + content.
+    assert client.create_payload_index.call_count == 2
+    fields = [c.kwargs["field_name"] for c in client.create_payload_index.call_args_list]
+    assert "title" in fields and "content" in fields
+
+
+@patch("python_vectordb.vector_db.qdrant.QdrantClient")
+def test_initialize_skips_existing_indexes(mock_client_cls):
+    client = MagicMock()
+    client.get_collections.return_value = MagicMock(collections=[])
+    info = MagicMock()
+    info.payload_schema = {"title": object(), "content": object()}
+    client.get_collection.return_value = info
+    mock_client_cls.return_value = client
+
+    adapter = _adapter()
+    assert adapter.initialize() is True
+    client.create_payload_index.assert_not_called()
+
+
+@patch("python_vectordb.vector_db.qdrant.QdrantClient")
+def test_initialize_index_failure_is_nonfatal(mock_client_cls):
+    client = MagicMock()
+    client.get_collections.return_value = MagicMock(collections=[])
+    info = MagicMock()
+    info.payload_schema = {}
+    client.get_collection.return_value = info
+    client.create_payload_index.side_effect = Exception("cannot index")
+    mock_client_cls.return_value = client
+
+    adapter = _adapter()
+    assert adapter.initialize() is True
+
+
+def test_hybrid_search_requires_ready():
+    adapter = _adapter()
+    with pytest.raises(Exception, match="not initialized"):
+        adapter.hybrid_search("q")
+
+
+def test_hybrid_search_uses_rrf_fusion():
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.client = MagicMock()
+
+    point = MagicMock()
+    point.id = 1
+    point.score = 0.6
+    point.payload = {"title": "t1", "content": "c1"}
+    adapter.client.query_points.return_value = MagicMock(points=[point])
+
+    results = adapter.hybrid_search("invoice", top_k=3)
+    assert len(results) == 1
+    assert results[0].id == "1"
+    assert results[0].score == 0.6
+
+    kwargs = adapter.client.query_points.call_args.kwargs
+    assert kwargs["limit"] == 3
+    assert kwargs["query"].fusion == models.Fusion.RRF
+    assert len(kwargs["prefetch"]) == 2
+    # Keyword prefetch carries a fulltext MatchText filter on title+content.
+    keyword = kwargs["prefetch"][1]
+    assert keyword["filter"].should[0].match.text == "invoice"
+
+
+def test_hybrid_search_keyword_disabled_uses_single_prefetch():
+    adapter = _adapter(keyword_method="disabled")
+    adapter.ready = True
+    adapter.client = MagicMock()
+    adapter.client.query_points.return_value = MagicMock(points=[])
+
+    adapter.hybrid_search("q")
+    kwargs = adapter.client.query_points.call_args.kwargs
+    assert len(kwargs["prefetch"]) == 1

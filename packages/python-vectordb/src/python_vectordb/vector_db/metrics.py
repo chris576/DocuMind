@@ -15,6 +15,24 @@ from typing import Dict
 
 VALID_METRICS: tuple[str, ...] = ("cosine", "euclidean", "dot", "manhattan")
 
+# Keyword retrieval strategy per vector database type.
+KEYWORD_DEFAULTS: Dict[str, str] = {
+    "qdrant": "native",    # Qdrant native BM25 query + fusion
+    "pgvector": "fts",     # PostgreSQL tsvector / ts_rank full text search
+    "chroma": "local",     # in-adapter local BM25 index (rank-bm25 + nltk)
+}
+
+
+def resolve_keyword_method(db_type: str, method: str = "auto") -> str:
+    """Resolve the keyword retrieval strategy for a database type.
+
+    ``auto`` selects the database's default strategy; explicit overrides are
+    returned as-is (the adapter is responsible for honoring them).
+    """
+    if method != "auto":
+        return method.lower()
+    return KEYWORD_DEFAULTS.get(db_type.lower(), "local")
+
 # PGVector distance operators used in ORDER BY and the SELECT score expression.
 PGVECTOR_OPERATORS: Dict[str, str] = {
     "cosine": "<=>",

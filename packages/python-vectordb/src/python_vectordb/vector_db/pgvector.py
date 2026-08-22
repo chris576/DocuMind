@@ -6,7 +6,7 @@ import psycopg2.extras
 
 from ..embeddings import EmbeddingProvider
 from .base import BaseVectorDB, VectorDBDocument, VectorDBSearchResult
-from .metrics import PGVECTOR_OPERATORS, normalize_pgvector_score
+from .metrics import PGVECTOR_OPERATORS, normalize_pgvector_score, resolve_keyword_method
 
 logger = logging.getLogger("python_vectordb.vector_db.pgvector")
 
@@ -20,6 +20,10 @@ class PgVectorVectorDB(BaseVectorDB):
         self.embedding_dimension = config.get("embedding_dimension", 384)
         self.similarity_metric = config.get("similarity_metric", "cosine").lower()
         self.operator = PGVECTOR_OPERATORS[self.similarity_metric]
+        self.keyword_method = resolve_keyword_method("pgvector", config.get("keyword_method", "auto"))
+        self.keyword_weight = float(config.get("keyword_weight", 0.3))
+        self.semantic_weight = float(config.get("semantic_weight", 0.7))
+        self.fts_language = config.get("fts_language", "german")
         self.connection = None
         self.ready = False
 
@@ -38,9 +42,15 @@ class PgVectorVectorDB(BaseVectorDB):
                         title TEXT NOT NULL,
                         content TEXT NOT NULL,
                         embedding VECTOR({self.embedding_dimension}),
-                        metadata JSONB DEFAULT '{{}}'
+                        metadata JSONB DEFAULT '{{}}',
+                        fts tsvector GENERATED ALWAYS AS (
+                            to_tsvector('{self.fts_language}', coalesce(title, '') || ' ' || coalesce(content, ''))
+                        ) STORED
                     )
                     """
+                )
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS {self.table_name}_fts_idx ON {self.table_name} USING GIN (fts)"
                 )
             self.connection.commit()
 
@@ -122,6 +132,81 @@ class PgVectorVectorDB(BaseVectorDB):
                 )
             )
         return documents
+
+    def hybrid_search(self, query: str, top_k: int = 10) -> List[VectorDBSearchResult]:
+        """Hybrid search: FTS (ts_rank) + vector distance, fused in SQL.
+
+        Combines the vector similarity score with Postgres full-text ranking
+        weighted by keyword/semantic weights. Falls back to semantic-only when
+        the FTS channel yields no matches or keyword retrieval is disabled.
+        """
+        if not self.ready or not self.connection:
+            raise Exception("PGVector not initialized")
+
+        query_vector = str(self.embedding_provider.encode_query(query))
+        vector_expr = f"1 - (embedding {self.operator} %s::vector)"
+
+        if self.keyword_method in ("fts", "auto"):
+            rank = (
+                f"ts_rank(fts, plainto_tsquery('{self.fts_language}', %s))"
+            )
+            fts_match = f"fts @@ plainto_tsquery('{self.fts_language}', %s)"
+            with self.connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT id, title, content, metadata,
+                           {vector_expr} AS s_score,
+                           {rank} AS k_score,
+                           ({vector_expr}) * %s + {rank} * %s AS combined
+                    FROM {self.table_name}
+                    WHERE {fts_match}
+                    ORDER BY combined DESC
+                    LIMIT %s
+                    """,
+                    (
+                        query_vector,
+                        query,
+                        query_vector,
+                        self.semantic_weight,
+                        self.keyword_weight,
+                        query,
+                        top_k,
+                    ),
+                )
+                rows = cursor.fetchall()
+        else:
+            rows = self._semantic_rows(query_vector, top_k)
+
+        documents = []
+        for row in rows:
+            doc_id, title, content, metadata, s_score, _, _ = row
+            documents.append(
+                VectorDBSearchResult(
+                    id=str(doc_id),
+                    title=title,
+                    content=content,
+                    score=float(s_score) if s_score is not None else 0.0,
+                    metadata=metadata or {},
+                )
+            )
+        return documents
+
+    def _semantic_rows(self, query_vector: str, top_k: int):
+        """Fetch semantic-only rows (used when keyword channel is disabled)."""
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT id, title, content, metadata,
+                       1 - (embedding {self.operator} %s::vector) AS s_score,
+                       0.0 AS k_score,
+                       1 - (embedding {self.operator} %s::vector) AS combined
+                FROM {self.table_name}
+                ORDER BY embedding {self.operator} %s::vector
+                LIMIT %s
+                """,
+                (query_vector, query_vector, query_vector, top_k),
+            )
+            return cursor.fetchall()
 
     def delete_collection(self) -> None:
         if not self.connection:

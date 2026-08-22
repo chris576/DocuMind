@@ -1,4 +1,5 @@
 """Unit tests for the generation pipeline FastAPI endpoints (mocked provider)."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -15,9 +16,7 @@ def client(monkeypatch):
     provider.provider_name = "openai"
     provider.model = "gpt-4"
     provider.generate = AsyncMock(
-        return_value=generation.GenerateResponse(
-            answer="Answer", provider="openai", model="gpt-4"
-        )
+        return_value=generation.GenerateResponse(answer="Answer", provider="openai", model="gpt-4")
     )
 
     async def _aiter():
@@ -30,6 +29,22 @@ def client(monkeypatch):
     monkeypatch.setattr(generation, "llm_provider", provider)
     monkeypatch.setattr(generation, "chat_sessions", {})
     return TestClient(generation.app), provider
+
+
+@pytest.fixture
+def no_retrieval(monkeypatch):
+    """Make the /context retrieval call return a fake response."""
+
+    async def fake_post(url, payload, timeout=30.0):  # noqa: ARG001
+        return {
+            "context": "Document 1: Rechnung\nZahlung frist\n\n",
+            "sources": [{"title": "Rechnung", "correspondent": "ACME", "date": "2024-01-15"}],
+            "query": payload["question"],
+        }
+
+    mock_post = AsyncMock(side_effect=fake_post)
+    monkeypatch.setattr(generation, "post_json", mock_post)
+    return mock_post
 
 
 def test_health(client):
@@ -57,6 +72,41 @@ def test_generate(client):
     provider.generate.assert_awaited_once()
 
 
+def test_generate_without_context_fetches_retrieval(client, no_retrieval):
+    c, provider = client
+    resp = c.post("/generate", json={"question": "Was ist drin?"})
+    assert resp.status_code == 200
+    assert resp.json()["answer"] == "Answer"
+    no_retrieval.assert_awaited_once()
+    sent: generation.GenerateRequest = provider.generate.await_args.args[0]
+    assert "Rechnung" in sent.context
+    assert sent.sources[0]["title"] == "Rechnung"
+
+
+def test_generate_with_context_skips_retrieval(client, no_retrieval):
+    c, provider = client
+    resp = c.post(
+        "/generate",
+        json={"question": "Q", "context": "Provided context", "sources": [{"title": "S"}]},
+    )
+    assert resp.status_code == 200
+    no_retrieval.assert_not_awaited()
+    sent: generation.GenerateRequest = provider.generate.await_args.args[0]
+    assert sent.context == "Provided context"
+
+
+def test_generate_retrieval_unavailable_keeps_plain(client, monkeypatch):
+    async def fake_post(url, payload, timeout=30.0):  # noqa: ARG001
+        return None
+
+    monkeypatch.setattr(generation, "post_json", fake_post)
+    c, provider = client
+    resp = c.post("/generate", json={"question": "Q"})
+    assert resp.status_code == 200
+    sent: generation.GenerateRequest = provider.generate.await_args.args[0]
+    assert sent.context == ""
+
+
 def test_generate_uninitialized(monkeypatch):
     monkeypatch.setattr(generation, "llm_provider", None)
     c = TestClient(generation.app)
@@ -80,9 +130,7 @@ def test_chat_init_and_message(client):
     assert init.status_code == 200
     chat_id = init.json()["chat_id"]
 
-    msg = c.post(
-        "/chat/message", json={"chat_id": chat_id, "message": "Hello"}
-    )
+    msg = c.post("/chat/message", json={"chat_id": chat_id, "message": "Hello"})
     assert msg.status_code == 200
     assert msg.json()["role"] == "assistant"
     assert msg.json()["message"] == "chat reply"
@@ -91,9 +139,7 @@ def test_chat_init_and_message(client):
 
 def test_chat_message_unknown_session(client):
     c, _ = client
-    resp = c.post(
-        "/chat/message", json={"chat_id": "nope", "message": "hi"}
-    )
+    resp = c.post("/chat/message", json={"chat_id": "nope", "message": "hi"})
     assert resp.status_code == 404
 
 
@@ -110,9 +156,7 @@ def test_chat_message_stream(client):
     init = c.post("/chat/init", json={"document_id": 1})
     chat_id = init.json()["chat_id"]
 
-    with c.stream(
-        "POST", "/chat/message/stream", json={"chat_id": chat_id, "message": "hi"}
-    ) as resp:
+    with c.stream("POST", "/chat/message/stream", json={"chat_id": chat_id, "message": "hi"}) as resp:
         assert resp.status_code == 200
         body = "".join(resp.iter_text())
 
@@ -132,9 +176,7 @@ def test_lifespan_sets_provider(monkeypatch):
     from contextlib import asynccontextmanager
 
     provider = MagicMock()
-    monkeypatch.setattr(
-        "python_llm.factory.LLMProviderFactory.create", lambda *a, **k: provider
-    )
+    monkeypatch.setattr("python_llm.factory.LLMProviderFactory.create", lambda *a, **k: provider)
     monkeypatch.setattr(generation, "llm_provider", None)
 
     @asynccontextmanager

@@ -1,4 +1,5 @@
 """Unit tests for the IngestionTask."""
+
 from unittest.mock import MagicMock
 
 import pytest

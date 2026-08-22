@@ -1,24 +1,19 @@
 import logging
-import os
-import pickle
 from datetime import datetime
 from typing import List
 
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
 from python_vectordb.reranking import Reranker, RerankerFactory
-from python_vectordb.vector_db import GetStatusQuery, SearchQuery, VectorDBFactory
-from rank_bm25 import BM25Okapi
+from python_vectordb.vector_db import (
+    GetStatusQuery,
+    HybridSearchQuery,
+    VectorDBFactory,
+)
+from python_vectordb.vector_db.bus import VectorDBCommandBus
 
 from .models import SearchEngineStatus, SearchRequest, SearchResult
 
 logger = logging.getLogger("retrieval")
 
-# Download NLTK resources
-nltk.download('punkt', quiet=True)
-nltk.download('punkt_tab', quiet=True)
-nltk.download('stopwords', quiet=True)
 
 class SearchEngine:
     def __init__(self, config: dict):
@@ -30,18 +25,13 @@ class SearchEngine:
         self.collection_name = config.get("collection_name", "documents")
         self.embedding_model_name = config.get("embedding_model", "paraphrase-multilingual-MiniLM-L12-v2")
         self.embedding_provider = config.get("embedding_provider", "sentence_transformer")
+        self.similarity_metric = config.get("similarity_metric", "cosine")
         self.cross_encoder_model_name = config.get("cross_encoder_model", "cross-encoder/ms-marco-MiniLM-L-6-v2")
-        self.bm25_weight = config.get("bm25_weight", 0.3)
-        self.semantic_weight = config.get("semantic_weight", 0.7)
         self.max_results = config.get("max_results", 20)
-        self.bm25_file = config.get("bm25_file", "./data/bm25_index.pkl")
 
-        self.vector_db = None
-        self.bm25 = None
-        self.tokenized_corpus = None
-        self.documents = []
+        # Foreign (untyped) object; declared Any so mypy does not flag access.
+        self.vector_db: VectorDBCommandBus | None = None
         self.is_initialized = False
-        self.bm25_initialized = False
 
         self.reranker: Reranker | None = None
 
@@ -54,6 +44,7 @@ class SearchEngine:
             "collection": self.collection_name,
             "embedding_model": self.embedding_model_name,
             "embedding_provider": self.embedding_provider,
+            "similarity_metric": self.similarity_metric,
         }
         if db_type == "chroma":
             db_config["url"] = self.chroma_url
@@ -97,173 +88,60 @@ class SearchEngine:
             self.status.chroma_ready = False
             return False
 
-    def setup_bm25(self, documents: List[dict]) -> bool:
-        try:
-            if not documents:
-                logger.error("No documents provided for BM25 setup")
-                return False
-
-            self.documents = documents
-            self.tokenized_corpus = []
-
-            stop_words = set()
-            for lang in ['english', 'german', 'french', 'spanish', 'italian']:
-                try:
-                    stop_words.update(stopwords.words(lang))
-                except:
-                    pass
-
-            for doc in documents:
-                text = f"{doc.get('title', '')} {doc.get('correspondent', '')} {doc.get('content', '')}"
-                tokens = word_tokenize(text.lower())
-                filtered_tokens = [token for token in tokens if token not in stop_words]
-                self.tokenized_corpus.append(filtered_tokens)
-
-            self.bm25 = BM25Okapi(self.tokenized_corpus)
-            self.bm25_initialized = True
-            self.status.bm25_ready = True
-            self.status.bm25_documents_count = len(self.tokenized_corpus)
-
-            self._save_bm25()
-            logger.info(f"BM25 index built with {len(self.tokenized_corpus)} documents")
-            return True
-        except Exception as e:
-            logger.error(f"Error setting up BM25: {str(e)}")
-            self.bm25_initialized = False
-            self.status.bm25_ready = False
-            return False
-
-    def _save_bm25(self):
-        try:
-            os.makedirs(os.path.dirname(self.bm25_file), exist_ok=True)
-            with open(self.bm25_file, 'wb') as f:
-                pickle.dump({
-                    'bm25': self.bm25,
-                    'tokenized_corpus': self.tokenized_corpus
-                }, f)
-            logger.info(f"Saved BM25 index to {self.bm25_file}")
-        except Exception as e:
-            logger.error(f"Error saving BM25: {str(e)}")
-
-    def _load_bm25(self) -> bool:
-        if not os.path.exists(self.bm25_file):
-            return False
-
-        try:
-            with open(self.bm25_file, 'rb') as f:
-                data = pickle.load(f)
-
-            self.bm25 = data['bm25']
-            self.tokenized_corpus = data['tokenized_corpus']
-
-            if not self.bm25 or not self.tokenized_corpus:
-                return False
-
-            self.bm25_initialized = True
-            self.status.bm25_ready = True
-            self.status.bm25_documents_count = len(self.tokenized_corpus)
-            logger.info(f"Loaded BM25 index with {len(self.tokenized_corpus)} documents")
-            return True
-        except Exception as e:
-            logger.error(f"Error loading BM25: {str(e)}")
-            return False
-
-    def keyword_search(self, query: str, top_k: int = None) -> List[dict]:
-        if not self.bm25_initialized:
-            raise Exception("BM25 not initialized")
-
-        top_k = top_k or self.max_results
-        query_tokens = word_tokenize(query.lower())
-        scores = self.bm25.get_scores(query_tokens)
-
-        doc_scores = [(i, score) for i, score in enumerate(scores)]
-        doc_scores.sort(key=lambda x: x[1], reverse=True)
-
-        results = []
-        for i, score in doc_scores[:top_k]:
-            if score > 0:
-                doc = self.documents[i]
-                results.append({
-                    "id": doc["id"],
-                    "title": doc["title"],
-                    "correspondent": doc.get("correspondent", ""),
-                    "date": doc.get("created", ""),
-                    "score": float(score),
-                    "content": doc.get("content", "")
-                })
-
-        return results
-
-    def semantic_search(self, query: str, top_k: int = None) -> List[dict]:
+    def semantic_search(self, query: str, top_k: int | None = None) -> List[dict]:
+        """Semantic-only search via the CQRS read bus."""
         if not self.vector_db:
             raise Exception("Vector database not initialized")
 
         top_k = top_k or self.max_results
-        results = self.vector_db.ask(SearchQuery(query=query, top_k=min(top_k, 100)))
+        results = self.vector_db.ask(HybridSearchQuery(query=query, top_k=min(top_k, 100)))
 
         documents = []
         for result in results:
             metadata = result.metadata or {}
-            documents.append({
-                "id": result.id,
-                "title": result.title,
-                "correspondent": metadata.get("correspondent", ""),
-                "date": metadata.get("created", ""),
-                "score": float(result.score),
-                "content": result.content,
-            })
+            documents.append(
+                {
+                    "id": result.id,
+                    "title": result.title,
+                    "correspondent": metadata.get("correspondent", ""),
+                    "date": metadata.get("created", ""),
+                    "score": float(result.score),
+                    "content": result.content,
+                }
+            )
 
         return documents
 
-    def hybrid_search(self, query: str, top_k: int = None) -> List[dict]:
+    def hybrid_search(self, query: str, top_k: int | None = None) -> List[dict]:
+        """Hybrid search, fully delegated to the adapter (CQRS read bus).
+
+        The adapter owns its keyword implementation (native BM25, FTS or local
+        BM25) and returns already-fused results; the engine only normalizes the
+        result shape for downstream use.
+        """
+        if not self.vector_db:
+            raise Exception("Vector database not initialized")
+
         top_k = top_k or self.max_results
+        results = self.vector_db.ask(HybridSearchQuery(query=query, top_k=top_k))
 
-        keyword_results = []
-        semantic_results = []
-
-        try:
-            keyword_results = self.keyword_search(query, top_k * 2)
-        except Exception as e:
-            logger.error(f"Keyword search failed: {str(e)}")
-
-        try:
-            semantic_results = self.semantic_search(query, top_k * 2)
-        except Exception as e:
-            logger.error(f"Semantic search failed: {str(e)}")
-
-        if not keyword_results and not semantic_results:
-            raise Exception("All search methods failed")
-
-        results_map = {}
-
-        if keyword_results:
-            max_keyword_score = max((r["score"] for r in keyword_results), default=1.0)
-            for r in keyword_results:
-                r["score"] = r["score"] / max_keyword_score if max_keyword_score > 0 else 0
-
-        for result in keyword_results:
-            doc_id = result["id"]
-            results_map[doc_id] = {
-                **result,
-                "score": result["score"] * self.bm25_weight
-            }
-
-        for result in semantic_results:
-            doc_id = result["id"]
-            if doc_id in results_map:
-                results_map[doc_id]["score"] += result["score"] * self.semantic_weight
-            else:
-                results_map[doc_id] = {
-                    **result,
-                    "score": result["score"] * self.semantic_weight
+        documents = []
+        for result in results:
+            metadata = result.metadata or {}
+            documents.append(
+                {
+                    "id": result.id,
+                    "title": result.title,
+                    "correspondent": metadata.get("correspondent", ""),
+                    "date": metadata.get("created", ""),
+                    "score": float(result.score),
+                    "content": result.content,
                 }
+            )
 
-        combined_results = list(results_map.values())
-        combined_results.sort(key=lambda x: x["score"], reverse=True)
+        return documents
 
-        return combined_results[:top_k]
-
-    def rerank_results(self, query: str, results: List[dict], top_k: int = None) -> List[dict]:
+    def rerank_results(self, query: str, results: List[dict], top_k: int | None = None) -> List[dict]:
         if not results:
             return []
 
@@ -272,7 +150,8 @@ class SearchEngine:
         try:
             if self.reranker is None:
                 raise Exception("Reranker not initialized")
-            return self.reranker.rerank(query, results, top_k)
+            reranked = self.reranker.rerank(query, results, top_k)
+            return list(reranked) if reranked else []
         except Exception as e:
             logger.error(f"Error reranking: {str(e)}")
             for r in results:
@@ -284,12 +163,12 @@ class SearchEngine:
             return ""
 
         try:
-            query_terms = set(word_tokenize(query.lower()))
+            query_terms = set(query.lower().split())
             sentences = content.split(". ")
 
             sentence_scores = []
             for sentence in sentences:
-                sentence_terms = set(word_tokenize(sentence.lower()))
+                sentence_terms = set(sentence.lower().split())
                 score = len(query_terms.intersection(sentence_terms))
                 sentence_scores.append((sentence, score))
 
@@ -342,16 +221,18 @@ class SearchEngine:
         formatted = []
         for result in reranked:
             snippet = self.create_snippet(request.query, result.get("content", ""))
-            formatted.append(SearchResult(
-                title=result.get("title", "Untitled"),
-                correspondent=result.get("correspondent", ""),
-                date=result.get("date", ""),
-                score=result.get("score", 0),
-                cross_score=result.get("cross_score", 0.5),
-                snippet=snippet,
-                doc_id=result.get("id"),
-                content=result.get("content", "")[:500]
-            ))
+            formatted.append(
+                SearchResult(
+                    title=result.get("title", "Untitled"),
+                    correspondent=result.get("correspondent", ""),
+                    date=result.get("date", ""),
+                    score=result.get("score", 0),
+                    cross_score=result.get("cross_score", 0.5),
+                    snippet=snippet,
+                    doc_id=result.get("id"),
+                    content=result.get("content", "")[:500],
+                )
+            )
 
         return formatted
 
@@ -362,8 +243,5 @@ class SearchEngine:
             "vector_db_type": self.vector_db_type,
             "vector_db_ready": self.status.chroma_ready,
             "chroma_ready": self.status.chroma_ready,
-            "bm25_ready": self.bm25_initialized,
-            "documents_count": len(self.documents),
-            "bm25_documents_count": len(self.tokenized_corpus) if self.tokenized_corpus else 0,
-            "last_updated": self.status.last_updated
+            "last_updated": self.status.last_updated,
         }

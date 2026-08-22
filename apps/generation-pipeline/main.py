@@ -8,6 +8,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from python_common.env import get_env
+from python_common.http import post_json
 from python_llm import (
     BaseLLMProvider,
     ChatMessage,
@@ -19,21 +21,20 @@ from python_llm.config import load_llm_config
 
 from src.models import ChatInitRequest, ChatMessageRequest
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("generation")
 
 # Global state
 llm_provider: BaseLLMProvider = None
 chat_sessions: Dict[str, dict] = {}
 
+
 class StatusResponse(BaseModel):
     service: str
     status: str
     provider: str = ""
     model: str = ""
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,20 +43,15 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Generation Pipeline")
 
     llm_config = load_llm_config()
-    llm_provider = LLMProviderFactory.create(
-        llm_config.provider, llm_config.to_provider_config()
-    )
+    llm_provider = LLMProviderFactory.create(llm_config.provider, llm_config.to_provider_config())
     logger.info(f"Initialized LLM provider: {llm_config.provider}")
 
     yield
 
     logger.info("Shutting down Generation Pipeline")
 
-app = FastAPI(
-    title="Generation Pipeline",
-    version="1.0.0",
-    lifespan=lifespan
-)
+
+app = FastAPI(title="Generation Pipeline", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,21 +61,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# URL of the retrieval pipeline for the generation->retrieval chain.
+# Overridable via env, e.g. in tests.
+RETRIEVAL_PIPELINE_URL = get_env("RETRIEVAL_PIPELINE_URL", "http://localhost:8002")
+
+
+async def _augment_with_retrieval_context(request: GenerateRequest) -> GenerateRequest:
+    """Fetch retrieval context from the retrieval pipeline when not supplied.
+
+    Generation consumes the retrieval output (CQRS read path). If the request
+    already carries context/sources (e.g. caller supplied RAG context), we keep
+    it as-is and skip the live HTTP round-trip.
+    """
+    if request.context or request.sources:
+        return request
+
+    payload = {
+        "question": request.question,
+        "max_sources": 5,
+    }
+    try:
+        fetched = await post_json(f"{RETRIEVAL_PIPELINE_URL}/context", payload, timeout=15.0)
+    except Exception as e:
+        logger.warning(f"Retrieval context unavailable: {str(e)}")
+        return request
+
+    if not fetched:
+        logger.warning("Retrieval pipeline returned no context; generating without context")
+        return request
+
+    request.context = fetched.get("context", "") or request.context
+    request.sources = fetched.get("sources", []) or request.sources
+    return request
+
+
 @app.get("/status", response_model=StatusResponse)
 async def status():
     return StatusResponse(
         service="generation-pipeline",
         status="ok" if llm_provider else "uninitialized",
         provider=llm_provider.provider_name if llm_provider else "",
-        model=llm_provider.model if llm_provider else ""
+        model=llm_provider.model if llm_provider else "",
     )
+
 
 @app.get("/health")
 async def health():
-    return {
-        "status": "healthy" if llm_provider else "unhealthy",
-        "service": "generation-pipeline"
-    }
+    return {"status": "healthy" if llm_provider else "unhealthy", "service": "generation-pipeline"}
+
 
 @app.post("/generate", response_model=GenerateResponse)
 async def generate(request: GenerateRequest):
@@ -87,11 +116,17 @@ async def generate(request: GenerateRequest):
         raise HTTPException(status_code=503, detail="LLM provider not initialized")
 
     try:
+        # CQRS-chain: generation consumes the retrieval pipeline's output.
+        # If the caller did not supply context/sources, fetch them live from
+        # the retrieval pipeline's /context endpoint.
+        request = await _augment_with_retrieval_context(request)
+
         response = await llm_provider.generate(request)
         return response
     except Exception as e:
         logger.error(f"Generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 @app.post("/generate/stream")
 async def generate_stream(request: GenerateRequest):
@@ -108,10 +143,8 @@ async def generate_stream(request: GenerateRequest):
         finally:
             yield "data: [DONE]\n\n"
 
-    return StreamingResponse(
-        stream_generator(),
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
 
 @app.post("/chat/init")
 async def chat_init(request: ChatInitRequest):
@@ -121,18 +154,17 @@ async def chat_init(request: ChatInitRequest):
         "document_id": request.document_id,
         "document_title": request.document_title,
         "document_content": request.document_content,
-        "history": []
+        "history": [],
     }
 
     system_message = f"You are a helpful assistant analyzing the document: {request.document_title or 'Unknown'}"
     if request.document_content:
         system_message += f"\n\nDocument content:\n{request.document_content[:2000]}"
 
-    chat_sessions[chat_id]["history"].append(
-        ChatMessage(role="system", content=system_message)
-    )
+    chat_sessions[chat_id]["history"].append(ChatMessage(role="system", content=system_message))
 
     return {"chat_id": chat_id, "status": "initialized"}
+
 
 @app.post("/chat/message")
 async def chat_message(request: ChatMessageRequest):
@@ -149,14 +181,11 @@ async def chat_message(request: ChatMessageRequest):
         response = await llm_provider.chat(session["history"])
         session["history"].append(ChatMessage(role="assistant", content=response))
 
-        return {
-            "chat_id": request.chat_id,
-            "message": response,
-            "role": "assistant"
-        }
+        return {"chat_id": request.chat_id, "message": response, "role": "assistant"}
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 @app.post("/chat/message/stream")
 async def chat_message_stream(request: ChatMessageRequest):
@@ -175,7 +204,7 @@ async def chat_message_stream(request: ChatMessageRequest):
             async for chunk in llm_provider.generate_stream(
                 GenerateRequest(
                     question=request.message,
-                    context="\n".join([m.content for m in session["history"] if m.role == "system"])
+                    context="\n".join([m.content for m in session["history"] if m.role == "system"]),
                 )
             ):
                 full_response += chunk
@@ -188,12 +217,11 @@ async def chat_message_stream(request: ChatMessageRequest):
         finally:
             yield "data: [DONE]\n\n"
 
-    return StreamingResponse(
-        stream_generator(),
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", "8003"))
     uvicorn.run(app, host="0.0.0.0", port=port)

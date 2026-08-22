@@ -18,6 +18,11 @@ def test_vector_db_config_chroma():
         "embedding_model": "m1",
         "embedding_provider": "sentence_transformer",
         "similarity_metric": "cosine",
+        "keyword_method": "auto",
+        "keyword_weight": 0.3,
+        "semantic_weight": 0.7,
+        "fts_language": "german",
+        "keyword_index_file": "./data/bm25_index.pkl",
         "url": "http://localhost:8000",
     }
     assert cfg.to_embedding_config() == {
@@ -28,6 +33,28 @@ def test_vector_db_config_chroma():
         "reranker_provider": "cross_encoder",
         "cross_encoder_model": "m2",
     }
+
+
+def test_vector_db_config_keyword_overrides():
+    cfg = VectorDBConfig(
+        vector_db_type="chroma",
+        embedding_provider="st",
+        reranker_provider="ce",
+        collection_name="docs",
+        embedding_model="m1",
+        cross_encoder_model="m2",
+        keyword_method="local",
+        keyword_weight=0.4,
+        semantic_weight=0.6,
+        fts_language="english",
+        keyword_index_file="/tmp/kw.pkl",
+    )
+    conf = cfg.to_vector_db_config()
+    assert conf["keyword_method"] == "local"
+    assert conf["keyword_weight"] == 0.4
+    assert conf["semantic_weight"] == 0.6
+    assert conf["fts_language"] == "english"
+    assert conf["keyword_index_file"] == "/tmp/kw.pkl"
 
 
 def test_vector_db_config_qdrant():

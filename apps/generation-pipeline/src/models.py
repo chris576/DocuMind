@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from python_llm import ChatMessage
 
 
@@ -21,7 +21,7 @@ class ChatInitRequest(BaseModel):
 class ChatMessageRequest(BaseModel):
     chat_id: str
     message: str
-    history: List[ChatMessage] = []
+    history: List[ChatMessage] = Field(default_factory=list)
 
 
 class ChatResponse(BaseModel):

@@ -7,7 +7,7 @@ from qdrant_client.http import models
 
 from ..embeddings import EmbeddingProvider
 from .base import BaseVectorDB, VectorDBDocument, VectorDBSearchResult
-from .metrics import QDRANT_DISTANCES
+from .metrics import QDRANT_DISTANCES, resolve_keyword_method
 
 logger = logging.getLogger("python_vectordb.vector_db.qdrant")
 
@@ -42,6 +42,9 @@ class QdrantVectorDB(BaseVectorDB):
         self.embedding_dimension = config.get("embedding_dimension", 384)
         self.similarity_metric = config.get("similarity_metric", "cosine").lower()
         self.distance = models.Distance[QDRANT_DISTANCES[self.similarity_metric]]
+        self.keyword_method = resolve_keyword_method("qdrant", config.get("keyword_method", "auto"))
+        self.keyword_weight = float(config.get("keyword_weight", 0.3))
+        self.semantic_weight = float(config.get("semantic_weight", 0.7))
         self.client = None
         self.ready = False
 
@@ -63,6 +66,9 @@ class QdrantVectorDB(BaseVectorDB):
                     ),
                 )
 
+            # Ensure full-text payload indexes so the native BM25 query works.
+            self._ensure_keyword_indexes()
+
             self.ready = True
             logger.info(f"Qdrant initialized: {self.collection_name}")
             return True
@@ -70,6 +76,35 @@ class QdrantVectorDB(BaseVectorDB):
             logger.error(f"Qdrant initialization failed: {str(e)}")
             self.ready = False
             return False
+
+    def _ensure_keyword_indexes(self) -> None:
+        """Best-effort fulltext payload index creation for BM25 search fields."""
+        if not self.client:
+            return
+        existing = set()
+        try:
+            info = self.client.get_collection(self.collection_name)
+            for field in (info.payload_schema or {}):
+                existing.add(field)
+        except Exception as e:
+            logger.debug(f"Could not inspect payload schema: {e}")
+
+        for field in ("title", "content"):
+            if field in existing:
+                continue
+            try:
+                self.client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=field,
+                    field_schema=models.TextIndexParams(
+                        type=models.TextIndexType.TEXT,
+                        tokenizer=models.TokenizerType.WORD,
+                        lowercase=True,
+                    ),
+                )
+                logger.info(f"Created fulltext index on '{field}'")
+            except Exception as e:
+                logger.warning(f"Could not create fulltext index on '{field}': {e}")
 
     def add_documents(self, documents: List[VectorDBDocument]) -> None:
         if not self.ready or not self.client:
@@ -136,6 +171,70 @@ class QdrantVectorDB(BaseVectorDB):
             points_selector=models.PointIdsList(points=point_ids),
         )
         logger.info(f"Deleted {len(document_ids)} documents from Qdrant")
+
+    def hybrid_search(self, query: str, top_k: int = 10) -> List[VectorDBSearchResult]:
+        """Hybrid search: native fulltext (BM25) + semantic, fused inside the adapter.
+
+        Uses Qdrant prefetch with a nearest query and a fulltext payload match
+        (on ``title``/``content``), merged by Reciprocal Rank Fusion (RRF).
+        The pipeline receives a single fused result list; only the adapter
+        knows the concrete Qdrant-level fusion.
+        """
+        if not self.ready or not self.client:
+            raise Exception("Qdrant not initialized")
+
+        return self._prefetch_hybrid(query, top_k)
+
+    def _prefetch_hybrid(self, query: str, top_k: int) -> List[VectorDBSearchResult]:
+        """Run the native Qdrant prefetch query (nearest + fulltext) + RRF fusion."""
+        fetch_n = max(top_k * 2, 10)
+        prefetch: List[Dict[str, Any]] = []
+
+        query_vector = self.embedding_provider.encode_query(query)
+        prefetch.append({"query": query_vector, "using": None, "limit": fetch_n})
+
+        if self.keyword_method in ("native", "bm25"):
+            prefetch.append(
+                {
+                    "query": query_vector,
+                    "using": None,
+                    "filter": models.Filter(
+                        should=[
+                            models.FieldCondition(
+                                key=field,
+                                match=models.MatchText(text=query),
+                            )
+                            for field in ("title", "content")
+                        ]
+                    ),
+                    "params": models.SearchParams(),
+                    "limit": fetch_n,
+                }
+            )
+
+        if not prefetch:
+            return []
+
+        resp = self.client.query_points(
+            collection_name=self.collection_name,
+            prefetch=prefetch,
+            query=models.FusionQuery(fusion=models.Fusion.RRF),
+            limit=top_k,
+        )
+
+        documents = []
+        for point in resp.points:
+            payload = point.payload or {}
+            documents.append(
+                VectorDBSearchResult(
+                    id=str(point.id),
+                    title=payload.get("title", ""),
+                    content=payload.get("content", ""),
+                    score=float(point.score),
+                    metadata=payload,
+                )
+            )
+        return documents
 
     def get_status(self) -> Dict[str, Any]:
         if not self.ready or not self.client:

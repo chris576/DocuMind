@@ -78,9 +78,7 @@ class IngestionService:
             logger.error(f"Error checking for new documents: {str(e)}")
             return []
 
-    def load_documents(
-        self, force_refresh: bool = False, check_new: bool = False
-    ) -> List[SourceDocument]:
+    def load_documents(self, force_refresh: bool = False, check_new: bool = False) -> List[SourceDocument]:
         if force_refresh:
             logger.info("Forcing full refresh from API")
             self.documents = self.document_provider.fetch_documents()

@@ -21,6 +21,11 @@ class VectorDBConfig:
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None
     pgvector_url: str | None = None
+    keyword_method: str = "auto"
+    keyword_weight: float = 0.3
+    semantic_weight: float = 0.7
+    fts_language: str = "german"
+    keyword_index_file: str = "./data/bm25_index.pkl"
 
     def to_vector_db_config(self) -> Dict[str, Any]:
         """Build the dict expected by VectorDBFactory (delegates embedding)."""
@@ -31,6 +36,11 @@ class VectorDBConfig:
             "embedding_model": self.embedding_model,
             "embedding_provider": self.embedding_provider,
             "similarity_metric": self.similarity_metric,
+            "keyword_method": self.keyword_method,
+            "keyword_weight": self.keyword_weight,
+            "semantic_weight": self.semantic_weight,
+            "fts_language": self.fts_language,
+            "keyword_index_file": self.keyword_index_file,
         }
         if db_type == "chroma":
             db_config["url"] = self.chroma_url or "http://localhost:8000"
@@ -74,4 +84,9 @@ def load_vector_db_config() -> VectorDBConfig:
         qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
         qdrant_api_key=os.getenv("QDRANT_API_KEY"),
         pgvector_url=os.getenv("PGVECTOR_URL"),
+        keyword_method=os.getenv("KEYWORD_METHOD", "auto"),
+        keyword_weight=float(os.getenv("KEYWORD_WEIGHT", "0.3")),
+        semantic_weight=float(os.getenv("SEMANTIC_WEIGHT", "0.7")),
+        fts_language=os.getenv("FTS_LANGUAGE", "german"),
+        keyword_index_file=os.getenv("KEYWORD_INDEX_FILE", "./data/bm25_index.pkl"),
     )

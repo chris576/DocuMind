@@ -1,4 +1,5 @@
 """Unit tests for the IngestionService orchestrator."""
+
 from unittest.mock import MagicMock
 
 import pytest

@@ -35,9 +35,15 @@ def test_initialize_creates_table(mock_connect):
     assert adapter.initialize() is True
     assert adapter.ready is True
     conn.commit.assert_called()
-    cursor.execute.assert_called()
-    sql = " ".join(str(c) for c in cursor.execute.call_args_list[1].args)
-    assert "CREATE TABLE IF NOT EXISTS documents" in sql
+    assert cursor.execute.call_count >= 2
+    sqls = [str(c.args[0]) for c in cursor.execute.call_args_list]
+    assert any("CREATE TABLE IF NOT EXISTS documents" in s for s in sqls)
+    # FTS generated column present in DDL.
+    ddl = next(s for s in sqls if "CREATE TABLE IF NOT EXISTS documents" in s)
+    assert "tsvector GENERATED ALWAYS AS" in ddl
+    assert "to_tsvector('german'" in ddl
+    # GIN index created for full text search.
+    assert any("USING GIN (fts)" in s for s in sqls)
 
 
 @patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
@@ -237,3 +243,74 @@ def test_search_normalizes_euclidean_score(mock_connect):
     results = adapter.search("q")
     # Euclidean raw distance 5.0 -> 1/(1+5) = 1/6.
     assert abs(results[0].score - 1.0 / 6.0) < 1e-9
+
+
+def test_hybrid_search_requires_ready():
+    adapter = _adapter()
+    with pytest.raises(Exception, match="not initialized"):
+        adapter.hybrid_search("q")
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_hybrid_search_fuses_fts_and_vector(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchall.return_value = [
+        ("1", "t1", "c1", {"k": "v"}, 0.9, 0.5, 0.9),
+    ]
+    mock_connect.return_value = conn
+
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.connection = conn
+
+    results = adapter.hybrid_search("invoice")
+    assert len(results) == 1
+    assert results[0].id == "1"
+    assert results[0].score == 0.9
+
+    sql = cursor.execute.call_args.args[0]
+    assert "ts_rank" in sql
+    assert "plainto_tsquery('german'" in sql
+    assert "fts @@ plainto_tsquery('german'" in sql
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_hybrid_search_keyword_disabled_uses_semantic_rows(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchall.return_value = [
+        ("1", "t1", "c1", {}, 0.8, 0.0, 0.8),
+    ]
+    mock_connect.return_value = conn
+
+    adapter = _adapter(keyword_method="disabled")
+    adapter.ready = True
+    adapter.connection = conn
+
+    results = adapter.hybrid_search("q")
+    assert len(results) == 1
+    # Semantic-only path has no ts_rank in SQL.
+    sql = cursor.execute.call_args.args[0]
+    assert "ts_rank" not in sql
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_hybrid_search_uses_configured_fts_language(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchall.return_value = [
+        ("1", "t1", "c1", {}, 0.9, 0.5, 0.9),
+    ]
+    mock_connect.return_value = conn
+
+    adapter = _adapter(fts_language="english")
+    adapter.ready = True
+    adapter.connection = conn
+
+    adapter.hybrid_search("q")
+    sql = cursor.execute.call_args.args[0]
+    assert "plainto_tsquery('english'" in sql

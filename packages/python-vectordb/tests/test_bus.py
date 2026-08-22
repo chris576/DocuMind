@@ -17,7 +17,7 @@ from python_vectordb.vector_db.commands import (
     IndexDocumentsCommand,
     InitializeCommand,
 )
-from python_vectordb.vector_db.queries import GetStatusQuery, SearchQuery
+from python_vectordb.vector_db.queries import GetStatusQuery, HybridSearchQuery, SearchQuery
 
 
 def _writer():
@@ -83,6 +83,14 @@ def test_ask_get_status():
     bus = VectorDBCommandBus(reader=r)
     bus.ask(GetStatusQuery())
     r.get_status.assert_called_once()
+
+
+def test_ask_hybrid_search():
+    r = _reader()
+    bus = VectorDBCommandBus(reader=r)
+    r.hybrid_search.return_value = []
+    assert bus.ask(HybridSearchQuery(query="q", top_k=7)) == []
+    r.hybrid_search.assert_called_once_with("q", 7)
 
 
 def test_ask_unknown_query():

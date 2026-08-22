@@ -26,7 +26,7 @@ testpaths = ["tests"]
 addopts = "--cov --cov-report=term-missing --cov-fail-under=75"
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "main"]
 
 # Clean-Code-Linting: Fehler (E/F), Bugbear (B), Komplexität (C90),
 # Pylint-Idiome (PL), Vereinfachung (SIM). Bewusste Ausnahmen für Bestands-
@@ -55,6 +55,10 @@ max-complexity = 12
 [tool.ruff.lint.pylint]
 max-args = 8
 
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B104"]  # host="0.0.0.0": bewusste FastAPI/Docker-Bindung
+
 [tool.mypy]
 python_version = "3.11"
 check_untyped_defs = true
@@ -62,6 +66,6 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_return_any = true
-
-[tool.bandit]
-exclude_dirs = ["tests"]
+# Lokale Utility-Packages sind bewusst untypisiert (kein py.typed).
+# Mypy überspringt sie statt sie zu analysieren.
+ignore_missing_imports = true

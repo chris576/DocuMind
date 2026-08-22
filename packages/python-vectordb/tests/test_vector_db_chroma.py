@@ -188,7 +188,7 @@ def test_get_status_ready():
     adapter.ready = True
     adapter.collection = MagicMock()
     adapter.collection.count.return_value = 5
-    assert adapter.get_status() == {"ready": True, "document_count": 5}
+    assert adapter.get_status() == {"ready": True, "document_count": 5, "keyword_documents_count": 0}
 
 
 def test_get_status_ready_exception():
@@ -204,3 +204,136 @@ def test_flatten_metadata():
         {"a": 1, "b": [1, 2], "c": {"x": 1}, "d": "s"}
     )
     assert flat == {"a": 1, "b": "[1, 2]", "c": '{"x": 1}', "d": "s"}
+
+
+def test_hybrid_search_requires_ready():
+    adapter = _adapter()
+    with pytest.raises(Exception, match="not initialized"):
+        adapter.hybrid_search("q")
+
+
+def test_hybrid_search_empty_returns_empty():
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.collection = MagicMock()
+    adapter.collection.query.return_value = {"ids": []}
+    adapter._bm25 = None
+    assert adapter.hybrid_search("q") == []
+
+
+def test_hybrid_search_fuses_semantic_and_keyword():
+    adapter = _adapter(keyword_weight=0.5, semantic_weight=0.5)
+    adapter.ready = True
+    adapter.collection = MagicMock()
+    adapter.collection.query.return_value = {
+        "ids": [["1", "2"]],
+        "distances": [[0.2, 0.5]],
+        "metadatas": [[{"title": "t1"}, {"title": "t2"}]],
+        "documents": [["content1", "content2"]],
+    }
+    # Local BM25 corpus with one matching doc.
+    adapter._keyword_documents = [
+        {"id": "1", "title": "Rechnung", "content": "Zahlung frist", "correspondent": "", "created": ""},
+        {"id": "2", "title": "Vertrag", "content": "Laufzeit", "correspondent": "", "created": ""},
+    ]
+    adapter._ensure_nltk()
+    adapter._rebuild_local_index_from_state()
+
+    results = adapter.hybrid_search("Rechnung", top_k=5)
+    assert len(results) >= 1
+    # doc "1" matches both channels, so it is present and has a fused score.
+    by_id = {r.id: r for r in results}
+    assert "1" in by_id
+    assert by_id["1"].score > 0
+
+
+def test_hybrid_search_keyword_disabled_returns_semantic_only():
+    adapter = _adapter(keyword_method="disabled")
+    adapter.ready = True
+    adapter.collection = MagicMock()
+    adapter.collection.query.return_value = {
+        "ids": [["1"]],
+        "distances": [[0.1]],
+        "metadatas": [[{"title": "t1"}]],
+        "documents": [["content"]],
+    }
+    adapter._keyword_documents = []
+    adapter._bm25 = None
+    results = adapter.hybrid_search("q")
+    assert len(results) == 1
+
+
+def test_keyword_search_returns_scored_docs():
+    adapter = _adapter()
+    adapter._keyword_documents = [
+        {"id": "1", "title": "Invoice", "content": "payment due", "correspondent": "", "created": ""},
+        {"id": "2", "title": "Contract", "content": "term", "correspondent": "", "created": ""},
+        {"id": "3", "title": "Report", "content": "summary", "correspondent": "", "created": ""},
+    ]
+    adapter._ensure_nltk()
+    adapter._rebuild_local_index_from_state()
+    results = adapter._keyword_search("invoice payment", top_k=5)
+    assert any(r["id"] == "1" for r in results)
+
+
+def test_keyword_search_uninitialized_returns_empty():
+    adapter = _adapter()
+    adapter._bm25 = None
+    adapter._tokenized_corpus = None
+    assert adapter._keyword_search("q") == []
+
+
+@patch("python_vectordb.vector_db.chroma.chromadb.HttpClient")
+def test_local_index_persist_and_load(mock_client_cls, tmp_path):
+    client = MagicMock()
+    client.list_collections.return_value = []
+    mock_client_cls.return_value = client
+
+    index_file = str(tmp_path / "bm25.pkl")
+    adapter = _adapter(keyword_index_file=index_file)
+    assert adapter.initialize() is True
+
+    docs = [
+        VectorDBDocument(id="1", title="Alpha report", content="quarterly summary", metadata={}),
+        VectorDBDocument(id="2", title="Beta invoice", content="payment due", metadata={}),
+        VectorDBDocument(id="3", title="Gamma contract", content="term duration", metadata={}),
+    ]
+    adapter.add_documents(docs)
+    assert adapter._bm25 is not None
+    assert len(adapter._keyword_documents) == 3
+    assert isinstance(adapter._keyword_search("alpha report", 5)[0]["id"], str)
+
+
+@patch("python_vectordb.vector_db.chroma.chromadb.HttpClient")
+def test_delete_documents_updates_local_index(mock_client_cls):
+    client = MagicMock()
+    client.list_collections.return_value = []
+    mock_client_cls.return_value = client
+
+    adapter = _adapter()
+    assert adapter.initialize() is True
+    adapter._keyword_documents = [
+        {"id": "1", "title": "a", "content": "c", "correspondent": "", "created": ""},
+        {"id": "2", "title": "b", "content": "c", "correspondent": "", "created": ""},
+    ]
+    adapter._rebuild_local_index_from_state()
+
+    adapter.delete_documents(["2"])
+    assert [d["id"] for d in adapter._keyword_documents] == ["1"]
+
+
+@patch("python_vectordb.vector_db.chroma.chromadb.HttpClient")
+def test_delete_collection_removes_local_index(mock_client_cls, tmp_path):
+    client = MagicMock()
+    client.list_collections.return_value = []
+    mock_client_cls.return_value = client
+
+    index_file = str(tmp_path / "bm25.pkl")
+    adapter = _adapter(keyword_index_file=index_file)
+    assert adapter.initialize() is True
+    adapter.add_documents([VectorDBDocument(id="1", title="t", content="c", metadata={})])
+    assert adapter._bm25 is not None
+
+    adapter.delete_collection()
+    assert adapter._bm25 is None
+    assert adapter._keyword_documents == []

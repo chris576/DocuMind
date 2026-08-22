@@ -40,6 +40,15 @@ class VectorDBReader(ABC):
         pass
 
     @abstractmethod
+    def hybrid_search(self, query: str, top_k: int = 10) -> List[VectorDBSearchResult]:
+        """Hybrid search across keyword and vector channels.
+
+        The concrete keyword implementation (native BM25, FTS, local BM25) is
+        an adapter concern; callers only receive fused results.
+        """
+        pass
+
+    @abstractmethod
     def get_status(self) -> Dict[str, Any]:
         """Return the current status of the vector database."""
         pass

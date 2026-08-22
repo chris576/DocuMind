@@ -3,10 +3,8 @@ import os
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from python_common.env import get_env
-from python_common.http import post_json
 from python_dms import DocumentProviderFactory
 from python_dms.config import load_dms_config
 from python_vectordb.config import load_vector_db_config
@@ -16,15 +14,13 @@ from src.ingestion_service import IngestionService
 from src.models import IngestionRequest
 from src.tasks import IngestionTask
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("ingestion")
 
 # Global instances
-ingestion_service: IngestionService = None
-ingestion_task: IngestionTask = None
+ingestion_service: IngestionService | None = None
+ingestion_task: IngestionTask | None = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,9 +33,7 @@ async def lifespan(app: FastAPI):
 
     # Write-only vector database access (CQRS): ingestion never reads.
     vector_db = VectorDBFactory.create_writer(vector_db_config.to_vector_db_config())
-    document_provider = DocumentProviderFactory.create(
-        dms_config.to_document_provider_config()
-    )
+    document_provider = DocumentProviderFactory.create(dms_config.to_document_provider_config())
 
     ingestion_service = IngestionService(document_provider, vector_db)
     ingestion_task = IngestionTask(ingestion_service)
@@ -48,11 +42,8 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down Ingestion Pipeline")
 
-app = FastAPI(
-    title="Ingestion Pipeline",
-    version="1.0.0",
-    lifespan=lifespan
-)
+
+app = FastAPI(title="Ingestion Pipeline", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,32 +53,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/status")
 async def status():
+    if ingestion_service is None:
+        raise HTTPException(status_code=503, detail="Ingestion service not initialized")
     return ingestion_service.get_status()
+
 
 @app.get("/health")
 async def health():
     return {
-        "status": "healthy" if ingestion_service.is_initialized else "unhealthy",
-        "service": "ingestion-pipeline"
+        "status": "healthy" if ingestion_service and ingestion_service.is_initialized else "unhealthy",
+        "service": "ingestion-pipeline",
     }
 
+
 async def _push_documents_to_retrieval():
-    """Push all loaded documents to the retrieval pipeline to rebuild its BM25 index."""
-    retrieval_url = get_env("RETRIEVAL_PIPELINE_URL", "http://localhost:8002")
+    """Compatibility notification to the retrieval pipeline (deprecated).
+
+    The keyword index is now maintained on the ingestion write path (the same
+    IndexDocumentsCommand feeds the adapter's keyword channel). This routine
+    only logs; it no longer triggers a BM25 rebuild on the read side.
+    """
+    if ingestion_service is None:
+        return
     documents = [asdict(doc) for doc in ingestion_service.documents]
 
     if not documents:
         logger.info("No documents to push to retrieval pipeline")
         return
 
-    logger.info(f"Pushing {len(documents)} documents to retrieval pipeline")
-    await post_json(f"{retrieval_url}/index/build", {"documents": documents})
+    logger.info(
+        f"{len(documents)} documents indexed via write path "
+        "(keyword index maintained by adapter; retrieval push deprecated)"
+    )
 
 
 async def _run_ingestion_and_push(force_update: bool, check_new: bool):
     """Run ingestion and, on success, notify the retrieval pipeline."""
+    if ingestion_task is None:
+        logger.error("Ingestion task not initialized; cannot run")
+        return
     try:
         result = ingestion_task.run(force_update=force_update, check_new=check_new)
         if result.get("status") == "completed":
@@ -98,6 +105,8 @@ async def _run_ingestion_and_push(force_update: bool, check_new: bool):
 
 @app.post("/ingest")
 async def ingest(request: IngestionRequest, background_tasks: BackgroundTasks):
+    if ingestion_task is None:
+        raise HTTPException(status_code=503, detail="Ingestion task not initialized")
     if ingestion_task.running:
         return {"status": "running", "message": "Ingestion already in progress"}
 
@@ -105,8 +114,11 @@ async def ingest(request: IngestionRequest, background_tasks: BackgroundTasks):
 
     return {"status": "started", "message": "Ingestion started in background"}
 
+
 @app.post("/ingest/sync")
 async def ingest_sync(request: IngestionRequest):
+    if ingestion_task is None:
+        raise HTTPException(status_code=503, detail="Ingestion task not initialized")
     if ingestion_task.running:
         return {"status": "running", "message": "Ingestion already in progress"}
 
@@ -115,12 +127,17 @@ async def ingest_sync(request: IngestionRequest):
         await _push_documents_to_retrieval()
     return result
 
+
 @app.post("/check")
 async def check_updates():
+    if ingestion_service is None:
+        raise HTTPException(status_code=503, detail="Ingestion service not initialized")
     needs_update, message = ingestion_service.check_for_updates()
     return {"needs_update": needs_update, "message": message}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", "8001"))
     uvicorn.run(app, host="0.0.0.0", port=port)

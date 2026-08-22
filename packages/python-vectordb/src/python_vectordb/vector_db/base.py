@@ -46,6 +46,15 @@ class BaseVectorDB(VectorDBWriter, VectorDBReader, ABC):
         pass
 
     @abstractmethod
+    def hybrid_search(self, query: str, top_k: int = 10) -> List[VectorDBSearchResult]:
+        """Hybrid search across keyword and vector channels.
+
+        Concrete keyword implementation (native BM25, FTS, local BM25) is an
+        adapter concern; callers only receive fused results.
+        """
+        pass
+
+    @abstractmethod
     def delete_collection(self) -> None:
         """Delete the entire collection."""
         pass

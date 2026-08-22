@@ -7,6 +7,7 @@ from python_vectordb.vector_db.metrics import (
     QDRANT_DISTANCES,
     VALID_METRICS,
     normalize_pgvector_score,
+    resolve_keyword_method,
     validate_metric,
 )
 
@@ -57,6 +58,22 @@ def test_qdrant_distances():
         "dot": "DOT",
         "manhattan": "MANHATTAN",
     }
+
+
+def test_resolve_keyword_method_auto_defaults():
+    assert resolve_keyword_method("qdrant") == "native"
+    assert resolve_keyword_method("pgvector") == "fts"
+    assert resolve_keyword_method("chroma") == "local"
+    assert resolve_keyword_method("unknown") == "local"
+
+
+def test_resolve_keyword_method_explicit_override():
+    assert resolve_keyword_method("qdrant", "local") == "local"
+    assert resolve_keyword_method("chroma", "NATIVE") == "native"
+
+
+def test_resolve_keyword_method_auto_with_unknown_is_local():
+    assert resolve_keyword_method("sphinx") == "local"
 
 
 @pytest.mark.parametrize(

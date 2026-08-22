@@ -5,6 +5,7 @@ from .ingestion_service import IngestionService
 
 logger = logging.getLogger("ingestion.tasks")
 
+
 class IngestionTask:
     def __init__(self, service: IngestionService):
         self.service = service
@@ -41,10 +42,7 @@ class IngestionTask:
                 if force_update:
                     docs_to_index = self.service.documents
                 else:
-                    docs_to_index = [
-                        doc for doc in self.service.documents
-                        if doc.id in self.service.new_document_ids
-                    ]
+                    docs_to_index = [doc for doc in self.service.documents if doc.id in self.service.new_document_ids]
 
                 self.service.add_documents_to_vector_db(docs_to_index)
                 self.service.status.message = f"Indexed {len(docs_to_index)} documents"
@@ -59,7 +57,7 @@ class IngestionTask:
             return {
                 "status": "completed",
                 "new_documents": new_docs_count,
-                "total_documents": len(self.service.documents)
+                "total_documents": len(self.service.documents),
             }
 
         except Exception as e:

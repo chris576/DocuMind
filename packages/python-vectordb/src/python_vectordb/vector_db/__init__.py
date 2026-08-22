@@ -17,7 +17,7 @@ from .factory import VectorDBFactory
 from .pgvector import PgVectorVectorDB
 from .ports import VectorDBReader, VectorDBWriter
 from .qdrant import QdrantVectorDB
-from .queries import GetStatusQuery, SearchQuery
+from .queries import GetStatusQuery, HybridSearchQuery, SearchQuery
 
 __all__ = [
     "BaseVectorDB",
@@ -35,6 +35,7 @@ __all__ = [
     "DeleteCollectionCommand",
     "DeleteDocumentsCommand",
     "SearchQuery",
+    "HybridSearchQuery",
     "GetStatusQuery",
     "ChromaVectorDB",
     "QdrantVectorDB",
