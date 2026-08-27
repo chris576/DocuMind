@@ -4,8 +4,8 @@ services:
   # Frontend
   frontend:
     build:
-      context: ../apps/frontend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/frontend/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -18,8 +18,8 @@ services:
   # Backend (NestJS)
   backend:
     build:
-      context: ../apps/backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/backend/Dockerfile
     ports:
       - "3001:3001"
     environment:
@@ -54,8 +54,8 @@ services:
   # Ingestion Pipeline (Python)
   ingestion-pipeline:
     build:
-      context: ../apps/ingestion-pipeline
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/ingestion-pipeline/Dockerfile
     ports:
       - "8001:8001"
     environment:
@@ -81,8 +81,8 @@ services:
   # Retrieval Pipeline (Python)
   retrieval-pipeline:
     build:
-      context: ../apps/retrieval-pipeline
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/retrieval-pipeline/Dockerfile
     ports:
       - "8002:8002"
     environment:
@@ -104,8 +104,8 @@ services:
   # Generation Pipeline (Python)
   generation-pipeline:
     build:
-      context: ../apps/generation-pipeline
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/generation-pipeline/Dockerfile
     ports:
       - "8003:8003"
     environment:

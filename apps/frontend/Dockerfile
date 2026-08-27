@@ -2,22 +2,19 @@ FROM node:26-alpine AS builder
 
 WORKDIR /app
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.15.0
 
-COPY package.json pnpm-lock.yaml* ./
-COPY tsconfig.json ./
-COPY vite.config.ts ./
-COPY index.html ./
-
-COPY src ./src
+# Gesamtes Repo kopieren (.dockerignore schließt node_modules/dist aus)
+COPY . .
 
 RUN pnpm install --frozen-lockfile || pnpm install
-RUN pnpm build
+# Baut Frontend + Workspace-Abhängigkeit (@paperless/shared)
+RUN pnpm --filter @paperless/frontend... build
 
 FROM nginx:alpine
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
+COPY apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 3000
 

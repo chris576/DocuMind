@@ -5,23 +5,23 @@ import type { SearchRequestDto, AskQuestionDto } from '@paperless/shared';
 
 @Injectable()
 export class RagService {
-  private readonly retrievalUrl = process.env.RETRIEVAL_PIPELINE_URL || 'http://localhost:8002';
-  private readonly generationUrl = process.env.GENERATION_PIPELINE_URL || 'http://localhost:8003';
+  private readonly retrievalUrl =
+    process.env.RETRIEVAL_PIPELINE_URL || 'http://localhost:8002';
+  private readonly generationUrl =
+    process.env.GENERATION_PIPELINE_URL || 'http://localhost:8003';
 
-  constructor(
-    private httpService: HttpService,
-  ) {}
+  constructor(private httpService: HttpService) {}
 
   async search(dto: SearchRequestDto) {
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.retrievalUrl}/search`, dto),
+        this.httpService.post(`${this.retrievalUrl}/search`, dto)
       );
       return response.data;
     } catch (error) {
       throw new HttpException(
         'RAG search failed',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
   }
@@ -33,7 +33,7 @@ export class RagService {
         this.httpService.post(`${this.retrievalUrl}/context`, {
           question: dto.question,
           max_sources: dto.maxSources || 5,
-        }),
+        })
       );
 
       // 2. Generate answer with generation pipeline
@@ -42,18 +42,22 @@ export class RagService {
           question: dto.question,
           context: contextResponse.data.context,
           sources: contextResponse.data.sources,
-        }),
+        })
       );
 
       return {
         answer: generationResponse.data.answer,
         sources: contextResponse.data.sources,
-        metrics: generationResponse.data.metrics,
+        metrics: {
+          promptTokens: generationResponse.data.prompt_tokens,
+          completionTokens: generationResponse.data.completion_tokens,
+          totalTokens: generationResponse.data.total_tokens,
+        },
       };
     } catch (error) {
       throw new HttpException(
         'RAG ask failed',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
   }
@@ -80,16 +84,19 @@ export class RagService {
   async startIndexing() {
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${process.env.INGESTION_PIPELINE_URL || 'http://localhost:8001'}/ingest`, {
-          force: false,
-          check_new: true,
-        }),
+        this.httpService.post(
+          `${process.env.INGESTION_PIPELINE_URL || 'http://localhost:8001'}/ingest`,
+          {
+            force: false,
+            check_new: true,
+          }
+        )
       );
       return response.data;
     } catch (error) {
       throw new HttpException(
         'Failed to start indexing',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
   }
@@ -97,13 +104,15 @@ export class RagService {
   async getIndexStatus() {
     try {
       const response = await firstValueFrom(
-        this.httpService.get(`${process.env.INGESTION_PIPELINE_URL || 'http://localhost:8001'}/status`),
+        this.httpService.get(
+          `${process.env.INGESTION_PIPELINE_URL || 'http://localhost:8001'}/status`
+        )
       );
       return response.data;
     } catch (error) {
       throw new HttpException(
         'Failed to get indexing status',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
   }

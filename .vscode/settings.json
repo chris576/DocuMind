@@ -5,5 +5,16 @@
         "${workspaceFolder}/packages/python-dms/src",
         "${workspaceFolder}/packages/python-llm/src",
         "${workspaceFolder}/packages/python-vectordb/src"
+    ],
+    "[yaml]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "[github-actions-workflow]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "prettier.documentSelectors": [
+        "**/.github/workflows/*.{yaml,yml}"
     ]
 }

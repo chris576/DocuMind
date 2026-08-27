@@ -58,14 +58,44 @@ Powered by **Retrieval-Augmented Generation (RAG)**, you can now search semantic
 
 ## 🚀 Installation
 
-### 🐳 Docker Compose (recommended)
+### ⚡ One-Liner (empfohlen)
+
+Der interaktive Installer klont das Repo, fragt die Stack-Typen ab (DMS,
+VectorDB neu/bestehend, LLM), schreibt eine vollständige `.env` und startet den
+kompletten Stack über reguläre `docker`-Befehle (kein docker compose). Die
+App-Images werden aus der GitHub Container Registry (GHCR) gepullt.
 
 ```bash
-git clone https://github.com/chris576/paperless-rag.git
-cd paperless-rag
+wget -qO- https://raw.githubusercontent.com/chris576/dms-rag/main/install.sh | bash
+# oder
+curl -fsSL https://raw.githubusercontent.com/chris576/dms-rag/main/install.sh | bash
+```
+
+Der Installer unterstützt:
+
+- **DMS**: Paperless-ngx (funktionsfähig) / Docspell (Platzhalter)
+- **VectorDB**: Chroma, Qdrant oder PGVector — jeweils **neu anlegen** (Container
+  wird gestartet) oder **bestehende Verbindung** nutzen (z. B. Paperless-Postgres
+  als PGVector, sofern die `vector`-Extension installiert ist)
+- **LLM**: OpenAI, Ollama, Anthropic oder Custom (OpenAI-kompatibel)
+- **Hybrid-Suche**: Keyword-Methode je DB (auto/native/fts/local) + Gewichtung
+
+Nach der Installation:
+
+```bash
+bash start.sh    # Stack starten
+bash stop.sh     # Stack stoppen (Volumes bleiben)
+bash update.sh   # Neue Images pullen + App-Container neu erstellen
+```
+
+### 🐳 Manuell (Docker)
+
+```bash
+git clone https://github.com/chris576/dms-rag.git
+cd dms-rag
 cp .env.example .env
-# Fill in PAPERLESS_API_URL, PAPERLESS_API_TOKEN, JWT_SECRET, ...
-docker compose -f infrastructure/docker-compose.yml up -d
+# Werte anpassen (PAPERLESS_API_URL, PAPERLESS_API_TOKEN, JWT_SECRET, ...)
+bash start.sh
 ```
 
 Services:
@@ -95,6 +125,61 @@ pnpm build
 # Type-check all packages
 pnpm typecheck
 ```
+
+---
+
+## 🔄 CI/CD & Releases
+
+Der Workflow folgt dem **GitHub-Flow**: Direkter Push auf `main` ist verboten.
+Entwicklung läuft über Feature-Branches und Pull Requests.
+
+```mermaid
+flowchart LR
+    A[Feature-Branch] -->|Push| B[Pull Request → main]
+    B --> C[CI: Tests & QA]
+    C -->|grün| D[Merge]
+    D --> E[Tag vX.Y.Z pushen]
+    E --> F[Release: Images bauen → GHCR + GitHub Release]
+```
+
+### Ablauf
+
+1. **Feature-Branch** erstellen: `git checkout -b feature/mein-feature`
+2. **Pull Request** gegen `main` öffnen → `ci.yml` läuft automatisch:
+   - **TypeScript**: `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`
+   - **Python**: `infrastructure/scripts/test-pipelines.sh all`
+     (ruff, mypy, bandit, pytest mit Coverage ≥ 75 %)
+3. **Merge** erst nach grünen Checks.
+4. **Release auslösen** (Tag auf `main`):
+   ```bash
+   git tag v1.2.3
+   git push origin v1.2.3
+   ```
+   `release.yml` baut alle 5 Images, pusht sie nach GHCR
+   (`ghcr.io/chris576/dms-rag/<service>:<version>` + `:latest`) und legt ein
+   GitHub Release mit Changelog an.
+
+### Branch-Protection (GitHub-Settings)
+
+In **Settings → Branches → Add rule** für `main` aktivieren:
+
+- ✅ **Require a pull request before merging**
+- ✅ **Require status checks to pass before merging** → `TypeScript Quality Gates` und `Python Quality Gates` (Namen der Jobs aus `ci.yml`)
+- ✅ **Do not allow bypassing the above settings**
+- ❌ **Allow force pushes** deaktiviert
+- ❌ **Allow deletions** deaktiviert
+
+### GHCR-Images
+
+| Service | Image |
+|---|---|
+| Backend | `ghcr.io/chris576/dms-rag/backend` |
+| Frontend | `ghcr.io/chris576/dms-rag/frontend` |
+| Ingestion | `ghcr.io/chris576/dms-rag/ingestion-pipeline` |
+| Retrieval | `ghcr.io/chris576/dms-rag/retrieval-pipeline` |
+| Generation | `ghcr.io/chris576/dms-rag/generation-pipeline` |
+
+Tags: `<version>` (z. B. `v1.2.3` → `1.2.3`) und `latest`.
 
 ---
 
