@@ -38,7 +38,13 @@ class VectorDBFactory:
             )
 
         embedding_provider = EmbeddingProviderFactory.create(config)
-        return adapter_class(config, embedding_provider)
+
+        # Echte Dimension aus dem Provider übernehmen (768/1024 statt Default 384),
+        # damit Modelle mit abweichender Dimension korrekt angelegt werden.
+        adapter_config = dict(config)
+        adapter_config["embedding_dimension"] = embedding_provider.dimension
+
+        return adapter_class(adapter_config, embedding_provider)
 
     @staticmethod
     def create_writer(config: Dict[str, Any]) -> VectorDBCommandBus:
