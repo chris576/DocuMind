@@ -1,4 +1,4 @@
-# DMS-RAG Documentation
+# DocuMind Documentation
 
 This folder contains the project documentation and marketing/landing assets.
 
@@ -14,7 +14,7 @@ This folder contains the project documentation and marketing/landing assets.
 Architecture decisions, connector/pipeline design, and build/toolchain facts are
 maintained in two places:
 
-- **Obsidian Vault** (human-readable, versioned): `/mnt/c/Users/chris/Documents/Obsidian/DMS-RAG/AI-Knowledge/`
+- **Obsidian Vault** (human-readable, versioned): `/mnt/c/Users/chris/Documents/Obsidian/DocuMind/AI-Knowledge/`
   - `project-overview.md` — tech stack & USP
   - `architecture/` — architecture overviews (e.g. connector layer)
   - `decisions/` — architecture decision records (ADRs)

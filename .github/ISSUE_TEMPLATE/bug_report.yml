@@ -4,7 +4,7 @@ title: "[Bug]: "
 labels: ["bug", "triage"]
 assignees:
   - ""
-projects: ["chris576/paperless-rag"]
+projects: ["chris576/documind"]
 
 body:
   - type: markdown
@@ -67,8 +67,8 @@ body:
   - type: input
     id: dms_rag_version
     attributes:
-      label: "🏷️ DMS-RAG Version"
-      description: "What version of DMS-RAG are you using? You can find this in your settings or docker-compose file."
+      label: "🏷️ DocuMind Version"
+      description: "What version of DocuMind are you using? You can find this in your settings or docker-compose file."
       placeholder: "e.g. v1.0.0, latest, commit hash, etc."
     validations:
       required: true
@@ -95,7 +95,7 @@ body:
     id: screenshots
     attributes:
       label: "🖼️ Screenshots of your settings page"
-      description: "Attach screenshots of your current DMS-RAG settings."
+      description: "Attach screenshots of your current DocuMind settings."
       placeholder: "Drag & drop images or provide a link."
 
   - type: dropdown

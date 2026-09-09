@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # ============================================================================
-# DMS-RAG Installer
+# DocuMind Installer
 #
-#   wget -qO- https://raw.githubusercontent.com/chris576/dms-rag/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/chris576/dms-rag/main/install.sh | bash
+#   wget -qO- https://raw.githubusercontent.com/chris576/documind/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/chris576/documind/main/install.sh | bash
 #
 # Interaktiver Installer: fragt die exakten Stack-Typen ab (DMS, VectorDB
 # neu/bestehend, LLM), schreibt eine vollständige .env und startet den
@@ -17,11 +17,11 @@ set -euo pipefail
 # ============================================================================
 
 # --- Konfiguration ----------------------------------------------------------
-REPO_URL="https://github.com/chris576/dms-rag.git"
-REPO_NAME="dms-rag"
-NETWORK_NAME="dms-rag"
-DATA_VOLUME="dms-rag-data"
-DEFAULT_REGISTRY="ghcr.io/chris576/dms-rag"
+REPO_URL="https://github.com/chris576/documind.git"
+REPO_NAME="documind"
+NETWORK_NAME="documind"
+DATA_VOLUME="documind-data"
+DEFAULT_REGISTRY="ghcr.io/chris576/documind"
 DEFAULT_TAG="latest"
 
 # --- Farben ----------------------------------------------------------------
@@ -401,7 +401,7 @@ write_env() {
 
   cat > "$ENV_FILE" <<EOF
 # ============================================================
-# DMS-RAG Umgebungskonfiguration
+# DocuMind Umgebungskonfiguration
 # Generiert von install.sh am $(date '+%Y-%m-%d %H:%M:%S')
 # Hinweis: URLs sind In-Netzwerk-Adressen (docker network $NETWORK_NAME).
 # Achtung: Keine Backticks oder \$(...) in Werten verwenden (wird beim
@@ -493,7 +493,7 @@ generate_scripts() {
   cat > "$REPO_DIR/start.sh" <<'STARTEOF'
 #!/usr/bin/env bash
 set -euo pipefail
-# DMS-RAG Stack starten (docker run, kein Compose)
+# DocuMind Stack starten (docker run, kein Compose)
 # Generiert von install.sh — bei Bedarf anpassen.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -508,10 +508,10 @@ set -a
 source .env
 set +a
 
-NETWORK="${NETWORK_NAME:-dms-rag}"
-REGISTRY="${IMAGE_REGISTRY:-ghcr.io/chris576/dms-rag}"
+NETWORK="${NETWORK_NAME:-documind}"
+REGISTRY="${IMAGE_REGISTRY:-ghcr.io/chris576/documind}"
 TAG="${IMAGE_TAG:-latest}"
-DATA_VOLUME="${DATA_VOLUME:-dms-rag-data}"
+DATA_VOLUME="${DATA_VOLUME:-documind-data}"
 
 container_running() { docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null | grep -q true; }
 container_exists() { docker inspect "$1" >/dev/null 2>&1; }
@@ -556,7 +556,7 @@ docker network inspect "$NETWORK" >/dev/null 2>&1 || docker network create "$NET
 
 # --- Datenbanken ---
 if [ "${BACKEND_DB_MODE:-new}" = "new" ]; then
-  ensure_container dms-rag-postgres \
+  ensure_container documind-postgres \
     --network "$NETWORK" \
     -e POSTGRES_USER=paperless \
     -e POSTGRES_PASSWORD=paperless \
@@ -570,7 +570,7 @@ fi
 if [ "${VECTOR_DB_MODE:-new}" = "new" ]; then
   case "${VECTOR_DB_TYPE}" in
     chroma)
-      ensure_container dms-rag-chromadb \
+      ensure_container documind-chromadb \
         --network "$NETWORK" \
         -e IS_PERSISTENT=TRUE \
         -e ANONYMIZED_TELEMETRY=FALSE \
@@ -580,7 +580,7 @@ if [ "${VECTOR_DB_MODE:-new}" = "new" ]; then
         chromadb/chroma:latest
       ;;
     qdrant)
-      ensure_container dms-rag-qdrant \
+      ensure_container documind-qdrant \
         --network "$NETWORK" \
         -p 6333:6333 \
         -v qdrant_data:/qdrant/storage \
@@ -588,7 +588,7 @@ if [ "${VECTOR_DB_MODE:-new}" = "new" ]; then
         qdrant/qdrant:latest
       ;;
     pgvector)
-      ensure_container dms-rag-pgvector \
+      ensure_container documind-pgvector \
         --network "$NETWORK" \
         -e POSTGRES_USER=paperless \
         -e POSTGRES_PASSWORD=paperless \
@@ -603,7 +603,7 @@ fi
 
 # --- App-Container (Images aus GHCR) ---
 ensure_image "$REGISTRY/backend:$TAG" backend
-ensure_container dms-rag-backend \
+ensure_container documind-backend \
   --network "$NETWORK" \
   -e NODE_ENV=production \
   -e BACKEND_PORT=3001 \
@@ -631,7 +631,7 @@ ensure_container dms-rag-backend \
   "$REGISTRY/backend:$TAG"
 
 ensure_image "$REGISTRY/frontend:$TAG" frontend
-ensure_container dms-rag-frontend \
+ensure_container documind-frontend \
   --network "$NETWORK" \
   -e VITE_API_URL="${VITE_API_URL:-http://localhost:3001}" \
   -p 3000:80 \
@@ -639,7 +639,7 @@ ensure_container dms-rag-frontend \
   "$REGISTRY/frontend:$TAG"
 
 ensure_image "$REGISTRY/ingestion-pipeline:$TAG" ingestion-pipeline
-ensure_container dms-rag-ingestion \
+ensure_container documind-ingestion \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
   -e PORT=8001 \
@@ -668,7 +668,7 @@ ensure_container dms-rag-ingestion \
   "$REGISTRY/ingestion-pipeline:$TAG"
 
 ensure_image "$REGISTRY/retrieval-pipeline:$TAG" retrieval-pipeline
-ensure_container dms-rag-retrieval \
+ensure_container documind-retrieval \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
   -e PORT=8002 \
@@ -695,7 +695,7 @@ ensure_container dms-rag-retrieval \
   "$REGISTRY/retrieval-pipeline:$TAG"
 
 ensure_image "$REGISTRY/generation-pipeline:$TAG" generation-pipeline
-ensure_container dms-rag-generation \
+ensure_container documind-generation \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
   -e PORT=8003 \
@@ -725,7 +725,7 @@ STARTEOF
   cat > "$REPO_DIR/stop.sh" <<'STOPEOF'
 #!/usr/bin/env bash
 set -euo pipefail
-# DMS-RAG Stack stoppen (Container werden entfernt, Volumes bleiben).
+# DocuMind Stack stoppen (Container werden entfernt, Volumes bleiben).
 # Generiert von install.sh.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -737,11 +737,11 @@ if [ -f .env ]; then
   source .env
   set +a
 fi
-NETWORK="${NETWORK_NAME:-dms-rag}"
+NETWORK="${NETWORK_NAME:-documind}"
 
-for c in dms-rag-generation dms-rag-retrieval dms-rag-ingestion \
-         dms-rag-frontend dms-rag-backend \
-         dms-rag-pgvector dms-rag-qdrant dms-rag-chromadb dms-rag-postgres; do
+for c in documind-generation documind-retrieval documind-ingestion \
+         documind-frontend documind-backend \
+         documind-pgvector documind-qdrant documind-chromadb documind-postgres; do
   if docker inspect "$c" >/dev/null 2>&1; then
     echo "[INFO] Stoppe $c ..."
     docker rm -f "$c"
@@ -756,7 +756,7 @@ STOPEOF
   cat > "$REPO_DIR/update.sh" <<'UPDATEEOF'
 #!/usr/bin/env bash
 set -euo pipefail
-# DMS-RAG Update: neue Images pullen und App-Container neu erstellen.
+# DocuMind Update: neue Images pullen und App-Container neu erstellen.
 # Generiert von install.sh.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -771,7 +771,7 @@ set -a
 source .env
 set +a
 
-REGISTRY="${IMAGE_REGISTRY:-ghcr.io/chris576/dms-rag}"
+REGISTRY="${IMAGE_REGISTRY:-ghcr.io/chris576/documind}"
 TAG="${IMAGE_TAG:-latest}"
 
 for svc in backend frontend ingestion-pipeline retrieval-pipeline generation-pipeline; do
@@ -780,8 +780,8 @@ for svc in backend frontend ingestion-pipeline retrieval-pipeline generation-pip
 done
 
 # App-Container neu erstellen (DB-Container bleiben unangetastet)
-for c in dms-rag-generation dms-rag-retrieval dms-rag-ingestion \
-         dms-rag-frontend dms-rag-backend; do
+for c in documind-generation documind-retrieval documind-ingestion \
+         documind-frontend documind-backend; do
   docker rm -f "$c" 2>/dev/null || true
 done
 
@@ -807,7 +807,7 @@ print_summary() {
 # --- Main -------------------------------------------------------------------
 main() {
   echo -e "${CYAN}========================================${NC}"
-  echo -e "${CYAN}  DMS-RAG Installer${NC}"
+  echo -e "${CYAN}  DocuMind Installer${NC}"
   echo -e "${CYAN}========================================${NC}"
   echo ""
 

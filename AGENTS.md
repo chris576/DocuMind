@@ -1,4 +1,4 @@
-# AGENTS.md — DMS-RAG
+# AGENTS.md — DocuMind
 
 Konventionen für KI-Agenten (Copilot, Claude Code, Codex, Hermes u. a.) bei der Arbeit an diesem Projekt.
 
@@ -6,7 +6,7 @@ Konventionen für KI-Agenten (Copilot, Claude Code, Codex, Hermes u. a.) bei der
 
 Wichtige Projektdokumentation und Key-Aspekte werden **zusätzlich** in der Obsidian-Wissensdatenbank abgelegt:
 
-- **Pfad:** `/mnt/c/Users/chris/Documents/Obsidian/DMS-RAG/AI-Knowledge/`
+- **Pfad:** `/mnt/c/Users/chris/Documents/Obsidian/DocuMind/AI-Knowledge/`
 - **Natives Memory:** Kurzfristige Build-/Toolchain-Fakten liegen unter `/memories/repo/`.
 
 ## Trennung zwischen Nutzer und KI

@@ -55,8 +55,8 @@ jobs:
           file: apps/backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/chris576/dms-rag/backend:${{ steps.version.outputs.version }}
-            ghcr.io/chris576/dms-rag/backend:latest
+            ghcr.io/chris576/documind/backend:${{ steps.version.outputs.version }}
+            ghcr.io/chris576/documind/backend:latest
 
       - name: Build & push frontend
         uses: docker/build-push-action@v6
@@ -65,8 +65,8 @@ jobs:
           file: apps/frontend/Dockerfile
           push: true
           tags: |
-            ghcr.io/chris576/dms-rag/frontend:${{ steps.version.outputs.version }}
-            ghcr.io/chris576/dms-rag/frontend:latest
+            ghcr.io/chris576/documind/frontend:${{ steps.version.outputs.version }}
+            ghcr.io/chris576/documind/frontend:latest
 
       - name: Build & push ingestion-pipeline
         uses: docker/build-push-action@v6
@@ -75,8 +75,8 @@ jobs:
           file: apps/ingestion-pipeline/Dockerfile
           push: true
           tags: |
-            ghcr.io/chris576/dms-rag/ingestion-pipeline:${{ steps.version.outputs.version }}
-            ghcr.io/chris576/dms-rag/ingestion-pipeline:latest
+            ghcr.io/chris576/documind/ingestion-pipeline:${{ steps.version.outputs.version }}
+            ghcr.io/chris576/documind/ingestion-pipeline:latest
 
       - name: Build & push retrieval-pipeline
         uses: docker/build-push-action@v6
@@ -85,8 +85,8 @@ jobs:
           file: apps/retrieval-pipeline/Dockerfile
           push: true
           tags: |
-            ghcr.io/chris576/dms-rag/retrieval-pipeline:${{ steps.version.outputs.version }}
-            ghcr.io/chris576/dms-rag/retrieval-pipeline:latest
+            ghcr.io/chris576/documind/retrieval-pipeline:${{ steps.version.outputs.version }}
+            ghcr.io/chris576/documind/retrieval-pipeline:latest
 
       - name: Build & push generation-pipeline
         uses: docker/build-push-action@v6
@@ -95,8 +95,8 @@ jobs:
           file: apps/generation-pipeline/Dockerfile
           push: true
           tags: |
-            ghcr.io/chris576/dms-rag/generation-pipeline:${{ steps.version.outputs.version }}
-            ghcr.io/chris576/dms-rag/generation-pipeline:latest
+            ghcr.io/chris576/documind/generation-pipeline:${{ steps.version.outputs.version }}
+            ghcr.io/chris576/documind/generation-pipeline:latest
 
   release:
     name: Create GitHub Release

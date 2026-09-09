@@ -1,8 +1,8 @@
-# 📄 DMS-RAG
+# 📄 DocuMind
 
-[![License](https://img.shields.io/github/license/chris576/paperless-rag?cacheSeconds=1)](LICENSE)
+[![License](https://img.shields.io/github/license/chris576/documind?cacheSeconds=1)](LICENSE)
 
-**DMS-RAG** is an open-source RAG (Retrieval-Augmented Generation) backend for companies whose documents live in non-standardized DMS, ERP, or industry solutions. It brings automatic document classification, smart tagging, and semantic search using OpenAI-compatible APIs and Ollama.
+**DocuMind** is an open-source RAG (Retrieval-Augmented Generation) backend for companies whose documents live in non-standardized DMS, ERP, or industry solutions. It brings automatic document classification, smart tagging, and semantic search using OpenAI-compatible APIs and Ollama.
 
 It enables **fully automated document workflows**, **contextual chat**, and **powerful customization** — all via an intuitive web interface.
 
@@ -66,9 +66,9 @@ kompletten Stack über reguläre `docker`-Befehle (kein docker compose). Die
 App-Images werden aus der GitHub Container Registry (GHCR) gepullt.
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/chris576/dms-rag/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/chris576/documind/main/install.sh | bash
 # oder
-curl -fsSL https://raw.githubusercontent.com/chris576/dms-rag/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/chris576/documind/main/install.sh | bash
 ```
 
 Der Installer unterstützt:
@@ -91,8 +91,8 @@ bash update.sh   # Neue Images pullen + App-Container neu erstellen
 ### 🐳 Manuell (Docker)
 
 ```bash
-git clone https://github.com/chris576/dms-rag.git
-cd dms-rag
+git clone https://github.com/chris576/documind.git
+cd documind
 cp .env.example .env
 # Werte anpassen (PAPERLESS_API_URL, PAPERLESS_API_TOKEN, JWT_SECRET, ...)
 bash start.sh
@@ -156,7 +156,7 @@ flowchart LR
    git push origin v1.2.3
    ```
    `release.yml` baut alle 5 Images, pusht sie nach GHCR
-   (`ghcr.io/chris576/dms-rag/<service>:<version>` + `:latest`) und legt ein
+   (`ghcr.io/chris576/documind/<service>:<version>` + `:latest`) und legt ein
    GitHub Release mit Changelog an.
 
 ### Branch-Protection (GitHub-Settings)
@@ -173,11 +173,11 @@ In **Settings → Branches → Add rule** für `main` aktivieren:
 
 | Service | Image |
 |---|---|
-| Backend | `ghcr.io/chris576/dms-rag/backend` |
-| Frontend | `ghcr.io/chris576/dms-rag/frontend` |
-| Ingestion | `ghcr.io/chris576/dms-rag/ingestion-pipeline` |
-| Retrieval | `ghcr.io/chris576/dms-rag/retrieval-pipeline` |
-| Generation | `ghcr.io/chris576/dms-rag/generation-pipeline` |
+| Backend | `ghcr.io/chris576/documind/backend` |
+| Frontend | `ghcr.io/chris576/documind/frontend` |
+| Ingestion | `ghcr.io/chris576/documind/ingestion-pipeline` |
+| Retrieval | `ghcr.io/chris576/documind/retrieval-pipeline` |
+| Generation | `ghcr.io/chris576/documind/generation-pipeline` |
 
 Tags: `<version>` (z. B. `v1.2.3` → `1.2.3`) und `latest`.
 

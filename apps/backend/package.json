@@ -1,5 +1,5 @@
 {
-  "name": "@paperless/backend",
+  "name": "@documind/backend",
   "version": "1.0.0",
   "private": true,
   "engines": {
