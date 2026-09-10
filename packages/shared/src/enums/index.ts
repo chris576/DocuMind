@@ -12,13 +12,6 @@ export enum VectorDBType {
   PGVECTOR = 'pgvector',
 }
 
-export enum Scope {
-  RAG_READ = 'rag:read',
-  CHAT_READ = 'chat:read',
-  METRICS_READ = 'metrics:read',
-  ADMIN = 'admin',
-}
-
 export enum ProcessingStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',

@@ -25,17 +25,6 @@ export interface ILLMProvider {
   checkStatus(): Promise<{ status: string; model?: string }>;
 }
 
-export interface IAuthService {
-  validateToken(token: string): Promise<{
-    userId: number;
-    scopes: string[];
-  } | null>;
-  generateToken(payload: {
-    userId: number;
-    scopes: string[];
-  }): string;
-}
-
 export interface IMessageQueue {
   publish(queue: string, message: any): Promise<void>;
   consume(queue: string, handler: (message: any) => Promise<void>): Promise<void>;

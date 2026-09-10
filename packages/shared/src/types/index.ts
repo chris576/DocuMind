@@ -24,32 +24,6 @@ export interface ChatMessage {
   content: string;
 }
 
-export interface ExternalToken {
-  id: number;
-  userId: number;
-  name: string;
-  tokenPrefix: string;
-  scopes: string[];
-  isActive: boolean;
-  monthlyLimit?: number;
-  expiresAt?: string;
-  createdAt: string;
-  lastUsedAt?: string;
-}
-
-export interface TokenUsage {
-  tokenId: number;
-  endpoint: string;
-  method: string;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  latencyMs: number;
-  sourceIp?: string;
-  userAgent?: string;
-  timestamp: string;
-}
-
 export interface RAGStatus {
   serverUp: boolean;
   dataLoaded: boolean;

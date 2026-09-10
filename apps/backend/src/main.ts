@@ -5,7 +5,9 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
+  app.setGlobalPrefix('api');
+
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     transform: true,
@@ -15,15 +17,13 @@ async function bootstrap() {
   app.enableCors({
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+    allowedHeaders: ['Content-Type'],
   });
 
   const config = new DocumentBuilder()
-    .setTitle('DMS-RAG API')
-    .setDescription('AI-powered document management for any DMS/ERP')
+    .setTitle('DocuMind API')
+    .setDescription('MVP backend: ingestion, retrieval, generation pipelines')
     .setVersion('1.0')
-    .addBearerAuth()
-    .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')
     .build();
   
   const document = SwaggerModule.createDocument(app, config);

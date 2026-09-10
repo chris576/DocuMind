@@ -8,8 +8,8 @@ RUN npm install -g pnpm@9.15.0
 COPY . .
 
 RUN pnpm install --frozen-lockfile || pnpm install
-# Baut Frontend + Workspace-Abhängigkeit (@paperless/shared)
-RUN pnpm --filter @paperless/frontend... build
+# Baut Frontend + Workspace-Abhängigkeit (@documind/shared)
+RUN pnpm --filter @documind/frontend... build
 
 FROM nginx:alpine
 

@@ -7,12 +7,6 @@ const envSchema = z.object({
   BACKEND_PORT: z.string().default('3001'),
   FRONTEND_PORT: z.string().default('3000'),
   
-  // Database
-  DATABASE_URL: z.string().default('postgresql://paperless:paperless@localhost:5432/paperless_ai'),
-  
-  // JWT
-  JWT_SECRET: z.string().min(32),
-  
   // Paperless-ngx (backward-compatible; superseded by DOCUMENT_PROVIDER_*)
   PAPERLESS_API_URL: z.string().url(),
   PAPERLESS_API_TOKEN: z.string(),
@@ -48,6 +42,14 @@ const envSchema = z.object({
   INGESTION_PIPELINE_URL: z.string().default('http://localhost:8001'),
   RETRIEVAL_PIPELINE_URL: z.string().default('http://localhost:8002'),
   GENERATION_PIPELINE_URL: z.string().default('http://localhost:8003'),
+
+  // Pipeline-Ports (Container/Netzwerk + Host/publiziert)
+  INGESTION_PORT: z.string().default('8001'),
+  RETRIEVAL_PORT: z.string().default('8002'),
+  GENERATION_PORT: z.string().default('8003'),
+  INGESTION_HOST_PORT: z.string().default('8001'),
+  RETRIEVAL_HOST_PORT: z.string().default('8002'),
+  GENERATION_HOST_PORT: z.string().default('8003'),
 });
 
 export type Env = z.infer<typeof envSchema>;

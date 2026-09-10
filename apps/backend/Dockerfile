@@ -8,8 +8,8 @@ RUN npm install -g pnpm@9.15.0
 COPY . .
 
 RUN pnpm install --frozen-lockfile || pnpm install
-# Baut Backend + Workspace-Abhängigkeiten (@paperless/shared, @paperless/config)
-RUN pnpm --filter @paperless/backend... build
+# Baut Backend + Workspace-Abhängigkeiten (@documind/shared)
+RUN pnpm --filter @documind/backend... build
 
 FROM node:26-alpine
 

@@ -3,10 +3,9 @@ import { useState } from 'react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
-  { name: 'Documents', href: '/documents', icon: '📄' },
-  { name: 'Chat', href: '/chat', icon: '💬' },
-  { name: 'RAG', href: '/rag', icon: '🔍' },
-  { name: 'Settings', href: '/settings', icon: '⚙️' },
+  { name: 'Suche', href: '/search', icon: '🔍' },
+  { name: 'Frage/Antwort', href: '/ask', icon: '✨' },
+  { name: 'Ingestion', href: '/ingestion', icon: '📥' },
 ];
 
 export default function Layout() {
@@ -25,7 +24,7 @@ export default function Layout() {
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <span className="text-xl font-bold text-blue-600">DMS-RAG</span>
+                <span className="text-xl font-bold text-blue-600">DocuMind</span>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 {navigation.map((item) => (

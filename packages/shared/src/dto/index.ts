@@ -1,87 +1,62 @@
-import { ChatMessage, SearchResult } from '../types/index.js';
+import { SearchResult } from '../types/index.js';
 
 export interface SearchRequestDto {
   query: string;
   fromDate?: string;
   toDate?: string;
   correspondent?: string;
+  maxResults?: number;
 }
 
-export interface AskQuestionDto {
+export interface AskRequestDto {
   question: string;
-  maxSources?: number;
+  maxTokens?: number;
+  temperature?: number;
 }
 
-export interface ChatInitDto {
-  documentId: number;
-}
-
-export interface ChatMessageDto {
-  documentId: number;
-  message: string;
-}
-
-export interface CreateTokenDto {
-  name: string;
-  scopes: string[];
-  monthlyLimit?: number;
-  expiresAt?: string;
-}
-
-export interface TokenResponseDto {
-  id: number;
-  token: string;
-  name: string;
-  prefix: string;
-  scopes: string[];
-  monthlyLimit?: number;
-  expiresAt?: string;
-}
-
-export interface UsageResponseDto {
-  tokenId: number;
-  monthlyLimit?: number;
-  monthlyUsage: {
-    requestCount: number;
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-}
-
-export interface StatusResponseDto {
-  gateway: string;
-  scopes: string[];
-  rag: any;
-  ai: any;
-}
-
-export interface RAGSearchResponseDto {
-  results: SearchResult[];
-}
-
-export interface RAGAskResponseDto {
+export interface AskResponseDto {
   answer: string;
-  sources: Array<{
-    title: string;
-    correspondent: string;
-    date: string;
-    snippet: string;
-    docId?: number;
-  }>;
+  sources: SearchResult[];
   metrics?: {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
   };
+  model?: string;
+  provider?: string;
+}
+
+export interface IngestionRunDto {
+  force?: boolean;
+  checkNew?: boolean;
+}
+
+export interface IngestionStatusDto {
+  running: boolean;
+  lastIndexed?: string;
+  documentsCount: number;
+  upToDate: boolean;
+  message: string;
+}
+
+export interface ChatInitRequestDto {
+  documentId?: number;
+  documentTitle?: string;
+  documentContent?: string;
 }
 
 export interface ChatInitResponseDto {
-  documentTitle: string;
-  initialized: boolean;
+  chatId: string;
+  status: string;
+}
+
+export interface ChatMessageRequestDto {
+  chatId: string;
+  message: string;
 }
 
 export interface ChatMessageResponseDto {
-  content: string;
-  done: boolean;
+  chatId: string;
+  message: string;
+  role: string;
 }

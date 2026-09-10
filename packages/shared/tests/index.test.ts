@@ -4,7 +4,6 @@ import {
   LLMProviderType,
   ProcessingStatus,
   QueueName,
-  Scope,
   VectorDBType,
 } from "../src/index";
 
@@ -22,14 +21,6 @@ describe("shared enums", () => {
     expect(VectorDBType.QDRANT).toBe("qdrant");
     expect(VectorDBType.PGVECTOR).toBe("pgvector");
     expect(Object.values(VectorDBType)).toHaveLength(3);
-  });
-
-  it("Scope enumerates permission scopes", () => {
-    expect(Scope.RAG_READ).toBe("rag:read");
-    expect(Scope.CHAT_READ).toBe("chat:read");
-    expect(Scope.METRICS_READ).toBe("metrics:read");
-    expect(Scope.ADMIN).toBe("admin");
-    expect(Object.values(Scope)).toHaveLength(4);
   });
 
   it("ProcessingStatus enumerates lifecycle states", () => {
@@ -52,6 +43,5 @@ describe("shared types re-export", () => {
     const mod = await import("../src/index");
     expect(mod).toHaveProperty("LLMProviderType");
     expect(mod).toHaveProperty("VectorDBType");
-    expect(mod).toHaveProperty("Scope");
   });
 });

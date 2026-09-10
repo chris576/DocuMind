@@ -1,11 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AuthModule } from './auth/auth.module';
-import { RagModule } from './rag/rag.module';
-import { ChatModule } from './chat/chat.module';
-import { DocumentsModule } from './documents/documents.module';
-import { ExternalApiModule } from './external-api/external-api.module';
 import { HealthModule } from './health/health.module';
+import { IngestionModule } from './ingestion/ingestion.module';
+import { RetrievalModule } from './retrieval/retrieval.module';
+import { GenerationModule } from './generation/generation.module';
 
 @Module({
   imports: [
@@ -13,12 +11,10 @@ import { HealthModule } from './health/health.module';
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
     }),
-    AuthModule,
-    RagModule,
-    ChatModule,
-    DocumentsModule,
-    ExternalApiModule,
     HealthModule,
+    IngestionModule,
+    RetrievalModule,
+    GenerationModule,
   ],
 })
 export class AppModule {}

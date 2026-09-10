@@ -14,8 +14,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "paths": {
-      "@paperless/shared/*": ["./packages/shared/src/*"],
-      "@paperless/config/*": ["./packages/config/src/*"]
+      "@documind/shared/*": ["./packages/shared/src/*"],
+      "@documind/config/*": ["./packages/config/src/*"]
     }
   },
   "exclude": ["node_modules", "dist", "build", ".next"]

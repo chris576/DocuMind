@@ -22,7 +22,7 @@
     "react-router-dom": "^6.28.0",
     "@tanstack/react-query": "^5.62.0",
     "axios": "^1.7.0",
-    "@paperless/shared": "workspace:*"
+    "@documind/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",
