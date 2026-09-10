@@ -21,6 +21,9 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - INGESTION_PIPELINE_URL=http://ingestion-pipeline:${INGESTION_PORT:-8001}
+      - RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:${RETRIEVAL_PORT:-8002}
+      - GENERATION_PIPELINE_URL=http://generation-pipeline:${GENERATION_PORT:-8003}
 
   ingestion-pipeline:
     build:
@@ -28,9 +31,12 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ../apps/ingestion-pipeline:/app
+    ports:
+      - "${INGESTION_HOST_PORT:-8001}:${INGESTION_PORT:-8001}"
     environment:
       - PYTHONUNBUFFERED=1
       - DEBUG=true
+      - PORT=${INGESTION_PORT:-8001}
 
   retrieval-pipeline:
     build:
@@ -38,9 +44,12 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ../apps/retrieval-pipeline:/app
+    ports:
+      - "${RETRIEVAL_HOST_PORT:-8002}:${RETRIEVAL_PORT:-8002}"
     environment:
       - PYTHONUNBUFFERED=1
       - DEBUG=true
+      - PORT=${RETRIEVAL_PORT:-8002}
 
   generation-pipeline:
     build:
@@ -48,9 +57,27 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ../apps/generation-pipeline:/app
+    ports:
+      - "${GENERATION_HOST_PORT:-8003}:${GENERATION_PORT:-8003}"
     environment:
       - PYTHONUNBUFFERED=1
       - DEBUG=true
+      - PORT=${GENERATION_PORT:-8003}
+      - RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:${RETRIEVAL_PORT:-8002}
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=paperless
+      - POSTGRES_PASSWORD=paperless
+      - POSTGRES_DB=paperless_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - paperless-network
+
 
   pgvector:
     image: pgvector/pgvector:pg16

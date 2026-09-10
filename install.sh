@@ -51,6 +51,8 @@ for _k in IMAGE_REGISTRY IMAGE_TAG DOCUMENT_PROVIDER DOCUMENT_PROVIDER_URL \
           FTS_LANGUAGE KEYWORD_INDEX_FILE LLM_PROVIDER LLM_MODEL OPENAI_API_KEY \
           OLLAMA_BASE_URL ANTHROPIC_API_KEY CUSTOM_BASE_URL CUSTOM_API_KEY \
           CUSTOM_MODEL BACKEND_PORT DATABASE_URL BACKEND_DB_MODE JWT_SECRET API_KEY \
+          INGESTION_PORT INGESTION_HOST_PORT RETRIEVAL_PORT RETRIEVAL_HOST_PORT \
+          GENERATION_PORT GENERATION_HOST_PORT \
           EXTERNAL_API_ENABLED PAPERLESS_AI_INITIAL_SETUP SCAN_INTERVAL \
           PROCESS_PREDEFINED_DOCUMENTS TAGS ADD_AI_PROCESSED_TAG AI_PROCESSED_TAG_NAME \
           USE_PROMPT_TAGS PROMPT_TAGS USE_EXISTING_DATA SYSTEM_PROMPT; do
@@ -352,6 +354,18 @@ configure_backend() {
   fi
   VARS["BACKEND_PORT"]="${VARS[BACKEND_PORT]:-3001}"
   prompt "BACKEND_PORT" "Backend-Port (Host)"
+  VARS["INGESTION_PORT"]="${VARS[INGESTION_PORT]:-8001}"
+  prompt "INGESTION_PORT" "Ingestion-Pipeline-Port (Container/Netzwerk)"
+  VARS["INGESTION_HOST_PORT"]="${VARS[INGESTION_HOST_PORT]:-${VARS[INGESTION_PORT]}}"
+  prompt "INGESTION_HOST_PORT" "Ingestion-Pipeline-Port (Host)"
+  VARS["RETRIEVAL_PORT"]="${VARS[RETRIEVAL_PORT]:-8002}"
+  prompt "RETRIEVAL_PORT" "Retrieval-Pipeline-Port (Container/Netzwerk)"
+  VARS["RETRIEVAL_HOST_PORT"]="${VARS[RETRIEVAL_HOST_PORT]:-${VARS[RETRIEVAL_PORT]}}"
+  prompt "RETRIEVAL_HOST_PORT" "Retrieval-Pipeline-Port (Host)"
+  VARS["GENERATION_PORT"]="${VARS[GENERATION_PORT]:-8003}"
+  prompt "GENERATION_PORT" "Generation-Pipeline-Port (Container/Netzwerk)"
+  VARS["GENERATION_HOST_PORT"]="${VARS[GENERATION_HOST_PORT]:-${VARS[GENERATION_PORT]}}"
+  prompt "GENERATION_HOST_PORT" "Generation-Pipeline-Port (Host)"
   VARS["EXTERNAL_API_ENABLED"]="${VARS[EXTERNAL_API_ENABLED]:-no}"
   prompt_yesno "EXTERNAL_API_ENABLED" "Externe API aktivieren?"
   if [ -z "${VARS[JWT_SECRET]:-}" ]; then
@@ -463,11 +477,17 @@ API_KEY="${VARS[API_KEY]}"
 EXTERNAL_API_ENABLED="${VARS[EXTERNAL_API_ENABLED]}"
 
 # --- 7. Inter-Service-URLs & Pipeline-Ports ---
-INGESTION_PIPELINE_URL=http://ingestion-pipeline:8001
-RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:8002
-GENERATION_PIPELINE_URL=http://generation-pipeline:8003
+INGESTION_PORT="${VARS[INGESTION_PORT]}"
+INGESTION_HOST_PORT="${VARS[INGESTION_HOST_PORT]}"
+RETRIEVAL_PORT="${VARS[RETRIEVAL_PORT]}"
+RETRIEVAL_HOST_PORT="${VARS[RETRIEVAL_HOST_PORT]}"
+GENERATION_PORT="${VARS[GENERATION_PORT]}"
+GENERATION_HOST_PORT="${VARS[GENERATION_HOST_PORT]}"
+INGESTION_PIPELINE_URL=http://ingestion-pipeline:${VARS[INGESTION_PORT]}
+RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:${VARS[RETRIEVAL_PORT]}
+GENERATION_PIPELINE_URL=http://generation-pipeline:${VARS[GENERATION_PORT]}
 MAX_RESULTS=20
-VITE_API_URL=http://localhost:3001
+VITE_API_URL=http://localhost:${VARS[BACKEND_PORT]}
 
 # --- 8. Sonstiges (optional) ---
 PAPERLESS_AI_INITIAL_SETUP="${VARS[PAPERLESS_AI_INITIAL_SETUP]}"
@@ -642,7 +662,7 @@ ensure_image "$REGISTRY/ingestion-pipeline:$TAG" ingestion-pipeline
 ensure_container documind-ingestion \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
-  -e PORT=8001 \
+  -e PORT="${INGESTION_PORT:-8001}" \
   -e DOCUMENT_PROVIDER="${DOCUMENT_PROVIDER}" \
   -e DOCUMENT_PROVIDER_URL="${DOCUMENT_PROVIDER_URL}" \
   -e DOCUMENT_PROVIDER_TOKEN="${DOCUMENT_PROVIDER_TOKEN}" \
@@ -662,7 +682,7 @@ ensure_container documind-ingestion \
   -e SEMANTIC_WEIGHT="${SEMANTIC_WEIGHT}" \
   -e FTS_LANGUAGE="${FTS_LANGUAGE}" \
   -e KEYWORD_INDEX_FILE="${KEYWORD_INDEX_FILE}" \
-  -p 8001:8001 \
+  -p "${INGESTION_HOST_PORT:-8001}:${INGESTION_PORT:-8001}" \
   -v "${DATA_VOLUME}:/app/data" \
   --restart unless-stopped \
   "$REGISTRY/ingestion-pipeline:$TAG"
@@ -671,7 +691,7 @@ ensure_image "$REGISTRY/retrieval-pipeline:$TAG" retrieval-pipeline
 ensure_container documind-retrieval \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
-  -e PORT=8002 \
+  -e PORT="${RETRIEVAL_PORT:-8002}" \
   -e MAX_RESULTS="${MAX_RESULTS:-20}" \
   -e VECTOR_DB_TYPE="${VECTOR_DB_TYPE}" \
   -e EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER}" \
@@ -689,7 +709,7 @@ ensure_container documind-retrieval \
   -e SEMANTIC_WEIGHT="${SEMANTIC_WEIGHT}" \
   -e FTS_LANGUAGE="${FTS_LANGUAGE}" \
   -e KEYWORD_INDEX_FILE="${KEYWORD_INDEX_FILE}" \
-  -p 8002:8002 \
+  -p "${RETRIEVAL_HOST_PORT:-8002}:${RETRIEVAL_PORT:-8002}" \
   -v "${DATA_VOLUME}:/app/data" \
   --restart unless-stopped \
   "$REGISTRY/retrieval-pipeline:$TAG"
@@ -698,7 +718,7 @@ ensure_image "$REGISTRY/generation-pipeline:$TAG" generation-pipeline
 ensure_container documind-generation \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
-  -e PORT=8003 \
+  -e PORT="${GENERATION_PORT:-8003}" \
   -e LLM_PROVIDER="${LLM_PROVIDER}" \
   -e LLM_MODEL="${LLM_MODEL}" \
   -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
@@ -708,7 +728,7 @@ ensure_container documind-generation \
   -e CUSTOM_API_KEY="${CUSTOM_API_KEY}" \
   -e CUSTOM_MODEL="${CUSTOM_MODEL}" \
   -e RETRIEVAL_PIPELINE_URL="${RETRIEVAL_PIPELINE_URL}" \
-  -p 8003:8003 \
+  -p "${GENERATION_HOST_PORT:-8003}:${GENERATION_PORT:-8003}" \
   --restart unless-stopped \
   "$REGISTRY/generation-pipeline:$TAG"
 
@@ -716,9 +736,9 @@ echo ""
 echo "[OK] Stack gestartet."
 echo "  Frontend:  http://localhost:3000"
 echo "  Backend:   http://localhost:${BACKEND_PORT:-3001}"
-echo "  Ingestion: http://localhost:8001"
-echo "  Retrieval: http://localhost:8002"
-echo "  Generation:http://localhost:8003"
+  echo "  Ingestion: http://localhost:${INGESTION_HOST_PORT:-8001}"
+  echo "  Retrieval: http://localhost:${RETRIEVAL_HOST_PORT:-8002}"
+  echo "  Generation:http://localhost:${GENERATION_HOST_PORT:-8003}"
 STARTEOF
 
   # stop.sh

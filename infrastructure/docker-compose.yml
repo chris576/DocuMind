@@ -39,9 +39,9 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - QDRANT_API_KEY=${QDRANT_API_KEY:-}
       - PGVECTOR_URL=postgresql://paperless:paperless@pgvector:5432/paperless_ai
-      - INGESTION_PIPELINE_URL=http://ingestion-pipeline:8001
-      - RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:8002
-      - GENERATION_PIPELINE_URL=http://generation-pipeline:8003
+      - INGESTION_PIPELINE_URL=http://ingestion-pipeline:${INGESTION_PORT:-8001}
+      - RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:${RETRIEVAL_PORT:-8002}
+      - GENERATION_PIPELINE_URL=http://generation-pipeline:${GENERATION_PORT:-8003}
       - EXTERNAL_API_ENABLED=${EXTERNAL_API_ENABLED:-false}
     depends_on:
       - postgres
@@ -57,9 +57,10 @@ services:
       context: ..
       dockerfile: apps/ingestion-pipeline/Dockerfile
     ports:
-      - "8001:8001"
+      - "${INGESTION_HOST_PORT:-8001}:${INGESTION_PORT:-8001}"
     environment:
       - PYTHONUNBUFFERED=1
+      - PORT=${INGESTION_PORT:-8001}
       - PAPERLESS_API_URL=${PAPERLESS_API_URL}
       - PAPERLESS_API_TOKEN=${PAPERLESS_API_TOKEN}
       - DOCUMENT_PROVIDER=${DOCUMENT_PROVIDER:-paperless}
@@ -84,9 +85,10 @@ services:
       context: ..
       dockerfile: apps/retrieval-pipeline/Dockerfile
     ports:
-      - "8002:8002"
+      - "${RETRIEVAL_HOST_PORT:-8002}:${RETRIEVAL_PORT:-8002}"
     environment:
       - PYTHONUNBUFFERED=1
+      - PORT=${RETRIEVAL_PORT:-8002}
       - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-sentence_transformer}
       - RERANKER_PROVIDER=${RERANKER_PROVIDER:-cross_encoder}
@@ -107,14 +109,16 @@ services:
       context: ..
       dockerfile: apps/generation-pipeline/Dockerfile
     ports:
-      - "8003:8003"
+      - "${GENERATION_HOST_PORT:-8003}:${GENERATION_PORT:-8003}"
     environment:
       - PYTHONUNBUFFERED=1
+      - PORT=${GENERATION_PORT:-8003}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OLLAMA_API_URL=${OLLAMA_API_URL:-http://localhost:11434}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - CUSTOM_BASE_URL=${CUSTOM_BASE_URL}
       - CUSTOM_API_KEY=${CUSTOM_API_KEY}
+      - RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:${RETRIEVAL_PORT:-8002}
     networks:
       - paperless-network
 
