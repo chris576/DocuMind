@@ -155,9 +155,9 @@ flowchart LR
    git tag v1.2.3
    git push origin v1.2.3
    ```
-   `release.yml` baut alle 5 Images, pusht sie nach GHCR
-   (`ghcr.io/chris576/documind/<service>:<version>` + `:latest`) und legt ein
-   GitHub Release mit Changelog an.
+   `release.yml` baut alle 5 Images für `linux/amd64` und `linux/arm64`,
+   pusht sie nach GHCR (`ghcr.io/chris576/documind/<service>:<version>` +
+   `:latest`), publiziert den MCP-Server auf npm und legt ein GitHub Release an.
 
 ### Branch-Protection (GitHub-Settings)
 
@@ -179,7 +179,28 @@ In **Settings → Branches → Add rule** für `main` aktivieren:
 | Retrieval | `ghcr.io/chris576/documind/retrieval-pipeline` |
 | Generation | `ghcr.io/chris576/documind/generation-pipeline` |
 
-Tags: `<version>` (z. B. `v1.2.3` → `1.2.3`) und `latest`.
+Tags: `<version>` (z. B. `v1.2.3` → `1.2.3`) und `latest`. Alle Images werden
+als Multi-Arch-Manifest (`linux/amd64`, `linux/arm64`) veröffentlicht.
+
+### MCP-Server (npm)
+
+Der lokale MCP-Server ist als `@chrid235/documind-mcp-server` auf npm verfügbar
+und lässt sich direkt per `npx` in Agenten einbinden:
+
+```json
+{
+  "mcpServers": {
+    "documind": {
+      "command": "npx",
+      "args": ["-y", "@chrid235/documind-mcp-server"],
+      "env": {
+        "GATEWAY_URL": "http://localhost:3001",
+        "GATEWAY_API_TOKEN": "dein-token"
+      }
+    }
+  }
+}
+```
 
 ---
 

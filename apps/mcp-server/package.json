@@ -1,8 +1,18 @@
 {
-  "name": "@documind/mcp-server",
+  "name": "@chrid235/documind-mcp-server",
   "version": "1.0.0",
-  "private": true,
+  "description": "Local stdio MCP server for DocuMind — bridges MCP tools to the DocuMind gateway.",
   "type": "module",
+  "bin": {
+    "documind-mcp-server": "dist/server.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22.0.0"
   },
@@ -10,7 +20,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
-    "dev": "tsx src/server.ts"
+    "dev": "tsx src/server.ts",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.0",

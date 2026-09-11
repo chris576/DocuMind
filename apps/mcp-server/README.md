@@ -1,7 +1,17 @@
-# @documind/mcp-server
+# @chrid235/documind-mcp-server
 
 Lokaler MCP-Server (stdio) für DocuMind. Er übersetzt MCP-Tools in REST-Aufrufe
-an den DocuMind-Gateway (das bestehende `@documind/backend`).
+an den DocuMind-Gateway (das Backend).
+
+## Installation (npm)
+
+```bash
+# global installieren
+npm install -g @chrid235/documind-mcp-server
+
+# oder direkt per npx, ohne Installation
+npx -y @chrid235/documind-mcp-server
+```
 
 ## Konfiguration
 
@@ -10,21 +20,14 @@ an den DocuMind-Gateway (das bestehende `@documind/backend`).
 | `GATEWAY_URL` | `http://localhost:3001` | Basis-URL des Gateways |
 | `GATEWAY_API_TOKEN` | – | Optionales Bearer-Token (wird als `Authorization` Header gesendet) |
 
-## Build & Start
-
-```bash
-pnpm --filter @documind/mcp-server build
-node apps/mcp-server/dist/server.js
-```
-
 ## Einbindung in Agenten (stdio)
 
 ```json
 {
   "mcpServers": {
     "documind": {
-      "command": "node",
-      "args": ["/absoluter/pfad/zu/apps/mcp-server/dist/server.js"],
+      "command": "npx",
+      "args": ["-y", "@chrid235/documind-mcp-server"],
       "env": {
         "GATEWAY_URL": "http://localhost:3001",
         "GATEWAY_API_TOKEN": "dein-token"
@@ -32,6 +35,13 @@ node apps/mcp-server/dist/server.js
     }
   }
 }
+```
+
+## Lokal bauen
+
+```bash
+pnpm --filter @chrid235/documind-mcp-server build
+node apps/mcp-server/dist/server.js
 ```
 
 ## Tools

@@ -37,6 +37,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -54,6 +57,9 @@ jobs:
           context: .
           file: apps/backend/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/chris576/documind/backend:${{ steps.version.outputs.version }}
             ghcr.io/chris576/documind/backend:latest
@@ -64,6 +70,9 @@ jobs:
           context: .
           file: apps/frontend/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/chris576/documind/frontend:${{ steps.version.outputs.version }}
             ghcr.io/chris576/documind/frontend:latest
@@ -74,6 +83,9 @@ jobs:
           context: .
           file: apps/ingestion-pipeline/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/chris576/documind/ingestion-pipeline:${{ steps.version.outputs.version }}
             ghcr.io/chris576/documind/ingestion-pipeline:latest
@@ -84,6 +96,9 @@ jobs:
           context: .
           file: apps/retrieval-pipeline/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/chris576/documind/retrieval-pipeline:${{ steps.version.outputs.version }}
             ghcr.io/chris576/documind/retrieval-pipeline:latest
@@ -94,6 +109,9 @@ jobs:
           context: .
           file: apps/generation-pipeline/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/chris576/documind/generation-pipeline:${{ steps.version.outputs.version }}
             ghcr.io/chris576/documind/generation-pipeline:latest
@@ -110,3 +128,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create "$GITHUB_REF_NAME" --generate-notes
+
+  publish-mcp-npm:
+    name: Publish MCP server to npm
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9.15.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish
+        run: pnpm --filter @chrid235/documind-mcp-server publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

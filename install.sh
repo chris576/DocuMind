@@ -33,6 +33,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 DRY_RUN=0
+QUICKSTART=0
 REPO_DIR=""
 
 info()  { echo -e "${BLUE}[INFO]${NC} $*"; }
@@ -55,7 +56,9 @@ for _k in IMAGE_REGISTRY IMAGE_TAG DOCUMENT_PROVIDER DOCUMENT_PROVIDER_URL \
           GENERATION_PORT GENERATION_HOST_PORT \
           EXTERNAL_API_ENABLED PAPERLESS_AI_INITIAL_SETUP SCAN_INTERVAL \
           PROCESS_PREDEFINED_DOCUMENTS TAGS ADD_AI_PROCESSED_TAG AI_PROCESSED_TAG_NAME \
-          USE_PROMPT_TAGS PROMPT_TAGS USE_EXISTING_DATA SYSTEM_PROMPT; do
+          USE_PROMPT_TAGS PROMPT_TAGS USE_EXISTING_DATA SYSTEM_PROMPT \
+          GATEWAY_API_TOKEN GATEWAY_URL PIPELINE_CONTAINER_MAP \
+          PIPELINE_REGISTRY_JSON CONFIG_FILE; do
   VARS["$_k"]="${VARS[$_k]:-}"
 done
 unset _k
@@ -64,9 +67,11 @@ unset _k
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
+    --quickstart) QUICKSTART=1 ;;
     -h|--help)
-      echo "Usage: install.sh [--dry-run]"
-      echo "  --dry-run  docker-Befehle nur ausgeben, nicht ausführen"
+      echo "Usage: install.sh [--dry-run] [--quickstart]"
+      echo "  --dry-run     docker-Befehle nur ausgeben, nicht ausführen"
+      echo "  --quickstart  non-interaktiv mit sinnvollen Defaults"
       exit 0
       ;;
     *) warn "Unbekanntes Argument: $arg" ;;
@@ -403,6 +408,109 @@ configure_legacy() {
   prompt "SYSTEM_PROMPT" "System-Prompt (optional)"
 }
 
+# --- Quickstart-Defaults (non-interaktiv) -----------------------------------
+apply_quickstart_defaults() {
+  echo ""
+  info "Quickstart: verwende vorkonfigurierte Defaults (non-interaktiv)."
+
+  VARS["IMAGE_REGISTRY"]="${VARS[IMAGE_REGISTRY]:-$DEFAULT_REGISTRY}"
+  VARS["IMAGE_TAG"]="${VARS[IMAGE_TAG]:-$DEFAULT_TAG}"
+
+  # DMS: Paperless (Werte via Env/Flags überschreibbar)
+  VARS["DOCUMENT_PROVIDER"]="${VARS[DOCUMENT_PROVIDER]:-paperless}"
+  VARS["PAPERLESS_API_URL"]="${VARS[PAPERLESS_API_URL]:-http://localhost:8000}"
+  VARS["PAPERLESS_API_TOKEN"]="${VARS[PAPERLESS_API_TOKEN]:-}"
+  VARS["DOCUMENT_PROVIDER_URL"]="${VARS[DOCUMENT_PROVIDER_URL]:-${VARS[PAPERLESS_API_URL]}}"
+  VARS["DOCUMENT_PROVIDER_TOKEN"]="${VARS[DOCUMENT_PROVIDER_TOKEN]:-${VARS[PAPERLESS_API_TOKEN]}}"
+
+  # VectorDB: Chroma neu
+  VARS["VECTOR_DB_TYPE"]="${VARS[VECTOR_DB_TYPE]:-chroma}"
+  VARS["VECTOR_DB_MODE"]="${VARS[VECTOR_DB_MODE]:-new}"
+  VARS["CHROMA_URL"]="${VARS[CHROMA_URL]:-http://chromadb:8000}"
+
+  # Hybrid-Suche
+  VARS["KEYWORD_METHOD"]="${VARS[KEYWORD_METHOD]:-auto}"
+  VARS["KEYWORD_WEIGHT"]="${VARS[KEYWORD_WEIGHT]:-0.3}"
+  VARS["SEMANTIC_WEIGHT"]="${VARS[SEMANTIC_WEIGHT]:-0.7}"
+  VARS["FTS_LANGUAGE"]="${VARS[FTS_LANGUAGE]:-german}"
+  VARS["KEYWORD_INDEX_FILE"]="${VARS[KEYWORD_INDEX_FILE]:-/app/data/bm25_index.pkl}"
+
+  # LLM: Ollama
+  VARS["LLM_PROVIDER"]="${VARS[LLM_PROVIDER]:-ollama}"
+  VARS["LLM_MODEL"]="${VARS[LLM_MODEL]:-llama3.2}"
+  VARS["OLLAMA_BASE_URL"]="${VARS[OLLAMA_BASE_URL]:-http://localhost:11434}"
+
+  # Backend
+  VARS["BACKEND_DB_MODE"]="${VARS[BACKEND_DB_MODE]:-new}"
+  VARS["DATABASE_URL"]="${VARS[DATABASE_URL]:-postgresql://paperless:paperless@postgres:5432/paperless_ai}"
+  VARS["BACKEND_PORT"]="${VARS[BACKEND_PORT]:-3001}"
+  VARS["INGESTION_PORT"]="${VARS[INGESTION_PORT]:-8001}"
+  VARS["INGESTION_HOST_PORT"]="${VARS[INGESTION_HOST_PORT]:-${VARS[INGESTION_PORT]}}"
+  VARS["RETRIEVAL_PORT"]="${VARS[RETRIEVAL_PORT]:-8002}"
+  VARS["RETRIEVAL_HOST_PORT"]="${VARS[RETRIEVAL_HOST_PORT]:-${VARS[RETRIEVAL_PORT]}}"
+  VARS["GENERATION_PORT"]="${VARS[GENERATION_PORT]:-8003}"
+  VARS["GENERATION_HOST_PORT"]="${VARS[GENERATION_HOST_PORT]:-${VARS[GENERATION_PORT]}}"
+  VARS["EXTERNAL_API_ENABLED"]="${VARS[EXTERNAL_API_ENABLED]:-no}"
+
+  # Secrets
+  if [ -z "${VARS[JWT_SECRET]:-}" ]; then VARS["JWT_SECRET"]="$(generate_secret)"; fi
+  if [ -z "${VARS[API_KEY]:-}" ]; then VARS["API_KEY"]="$(generate_secret)"; fi
+}
+
+# --- config.json (Admin-Panel Base-Config) ---------------------------------
+write_config() {
+  echo ""
+  info "Schreibe config/config.json (Admin-Panel Base-Config) ..."
+  mkdir -p "$REPO_DIR/config"
+  local cfg="$REPO_DIR/config/config.json"
+  {
+    echo '{'
+    echo '  "version": 1,'
+    echo '  "llm": {'
+    echo "    \"provider\": \"${VARS[LLM_PROVIDER]}\","
+    echo "    \"model\": \"${VARS[LLM_MODEL]}\""
+    if [ -n "${VARS[OLLAMA_BASE_URL]:-}" ]; then
+      echo ",    \"baseUrl\": \"${VARS[OLLAMA_BASE_URL]}\""
+    fi
+    echo '  },'
+    echo '  "connectors": ['
+    echo '    {'
+    echo "      \"id\": \"${VARS[DOCUMENT_PROVIDER]}\","
+    echo "      \"type\": \"${VARS[DOCUMENT_PROVIDER]}\","
+    echo '      "enabled": true,'
+    if [ -n "${VARS[DOCUMENT_PROVIDER_URL]:-}" ]; then
+      echo "      \"url\": \"${VARS[DOCUMENT_PROVIDER_URL]}\","
+    fi
+    echo '      "tokenEnv": "DOCUMENT_PROVIDER_TOKEN"'
+    echo '    }'
+    echo '  ],'
+    echo '  "vectorDb": {'
+    echo "    \"type\": \"${VARS[VECTOR_DB_TYPE]}\","
+    echo '    "collection": "documents",'
+    echo '    "embeddingProvider": "sentence_transformer",'
+    echo '    "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",'
+    echo '    "rerankerProvider": "cross_encoder",'
+    echo '    "crossEncoderModel": "cross-encoder/ms-marco-MiniLM-L-6-v2",'
+    echo '    "similarityMetric": "cosine"'
+    case "${VARS[VECTOR_DB_TYPE]}" in
+      chroma)   [ -n "${VARS[CHROMA_URL]:-}" ]   && echo ",    \"chromaUrl\": \"${VARS[CHROMA_URL]}\"" ;;
+      qdrant)   [ -n "${VARS[QDRANT_URL]:-}" ]   && echo ",    \"qdrantUrl\": \"${VARS[QDRANT_URL]}\"" ;;
+      pgvector) [ -n "${VARS[PGVECTOR_URL]:-}" ] && echo ",    \"pgvectorUrl\": \"${VARS[PGVECTOR_URL]}\"" ;;
+    esac
+    echo '  },'
+    echo '  "hybridSearch": {'
+    echo "    \"keywordMethod\": \"${VARS[KEYWORD_METHOD]}\","
+    echo "    \"keywordWeight\": ${VARS[KEYWORD_WEIGHT]},"
+    echo "    \"semanticWeight\": ${VARS[SEMANTIC_WEIGHT]},"
+    echo "    \"ftsLanguage\": \"${VARS[FTS_LANGUAGE]}\","
+    echo "    \"keywordIndexFile\": \"${VARS[KEYWORD_INDEX_FILE]}\""
+    echo '  },'
+    echo '  "retrieval": { "maxResults": 20 }'
+    echo '}'
+  } > "$cfg"
+  ok "config.json geschrieben."
+}
+
 # --- .env schreiben ---------------------------------------------------------
 write_env() {
   echo ""
@@ -500,6 +608,12 @@ USE_PROMPT_TAGS="${VARS[USE_PROMPT_TAGS]}"
 PROMPT_TAGS="${VARS[PROMPT_TAGS]}"
 USE_EXISTING_DATA="${VARS[USE_EXISTING_DATA]}"
 SYSTEM_PROMPT="${VARS[SYSTEM_PROMPT]}"
+
+# --- 9. Gateway / MCP / Admin-Panel Config ---
+CONFIG_FILE="${VARS[CONFIG_FILE]}"
+GATEWAY_API_TOKEN="${VARS[GATEWAY_API_TOKEN]}"
+GATEWAY_URL="${VARS[GATEWAY_URL]}"
+PIPELINE_CONTAINER_MAP="${VARS[PIPELINE_CONTAINER_MAP]}"
 EOF
   ok ".env geschrieben."
 }
@@ -646,6 +760,9 @@ ensure_container documind-backend \
   -e RETRIEVAL_PIPELINE_URL="${RETRIEVAL_PIPELINE_URL}" \
   -e GENERATION_PIPELINE_URL="${GENERATION_PIPELINE_URL}" \
   -e EXTERNAL_API_ENABLED="${EXTERNAL_API_ENABLED}" \
+  -e CONFIG_FILE="/data/config.json" \
+  -e GATEWAY_API_TOKEN="${GATEWAY_API_TOKEN:-}" \
+  -v ./config:/data \
   -p "${BACKEND_PORT:-3001}:3001" \
   --restart unless-stopped \
   "$REGISTRY/backend:$TAG"
@@ -663,6 +780,7 @@ ensure_container documind-ingestion \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
   -e PORT="${INGESTION_PORT:-8001}" \
+  -e GATEWAY_URL="http://backend:3001" \
   -e DOCUMENT_PROVIDER="${DOCUMENT_PROVIDER}" \
   -e DOCUMENT_PROVIDER_URL="${DOCUMENT_PROVIDER_URL}" \
   -e DOCUMENT_PROVIDER_TOKEN="${DOCUMENT_PROVIDER_TOKEN}" \
@@ -692,6 +810,7 @@ ensure_container documind-retrieval \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
   -e PORT="${RETRIEVAL_PORT:-8002}" \
+  -e GATEWAY_URL="http://backend:3001" \
   -e MAX_RESULTS="${MAX_RESULTS:-20}" \
   -e VECTOR_DB_TYPE="${VECTOR_DB_TYPE}" \
   -e EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER}" \
@@ -719,6 +838,7 @@ ensure_container documind-generation \
   --network "$NETWORK" \
   -e PYTHONUNBUFFERED=1 \
   -e PORT="${GENERATION_PORT:-8003}" \
+  -e GATEWAY_URL="http://backend:3001" \
   -e LLM_PROVIDER="${LLM_PROVIDER}" \
   -e LLM_MODEL="${LLM_MODEL}" \
   -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
@@ -837,15 +957,26 @@ main() {
   ENV_FILE="$REPO_DIR/.env"
 
   load_existing_env
-  configure_registry
-  configure_dms
-  configure_vector_db
-  configure_keyword
-  configure_llm
-  configure_backend
-  configure_legacy
+
+  if [ "$QUICKSTART" = "1" ]; then
+    apply_quickstart_defaults
+  else
+    configure_registry
+    configure_dms
+    configure_vector_db
+    configure_keyword
+    configure_llm
+    configure_backend
+    configure_legacy
+  fi
+
+  # Gateway-Konfiguration (gilt für beide Modi)
+  VARS["CONFIG_FILE"]="${VARS[CONFIG_FILE]:-/data/config.json}"
+  VARS["GATEWAY_URL"]="${VARS[GATEWAY_URL]:-http://localhost:${VARS[BACKEND_PORT]:-3001}}"
+  VARS["GATEWAY_API_TOKEN"]="${VARS[GATEWAY_API_TOKEN]:-}"
 
   write_env
+  write_config
   generate_scripts
   print_summary
 
