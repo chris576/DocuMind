@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from python_llm.anthropic import AnthropicProvider
-from python_llm.base import GenerateRequest
+from python_llm.base import ChatMessage, GenerateRequest
 from python_llm.custom import CustomProvider
 from python_llm.ollama import OllamaProvider
 from python_llm.openai import OpenAIProvider
@@ -126,3 +126,192 @@ async def test_custom_generate(mock_openai_cls):
     result = await provider.generate(GenerateRequest(question="Q"))
     assert result.answer == "C"
     assert result.provider == "custom"
+
+
+@pytest.mark.anyio
+async def test_openai_chat():
+    client = _openai_client()
+    resp = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="chat A"))]
+    )
+    client.chat.completions.create = AsyncMock(return_value=resp)
+
+    provider = OpenAIProvider({"model": "gpt-4", "openai_api_key": "k"})
+    provider.client = client
+    reply = await provider.chat([ChatMessage(role="user", content="hi")])
+    assert reply == "chat A"
+    kwargs = client.chat.completions.create.await_args.kwargs
+    assert kwargs["model"] == "gpt-4"
+    assert kwargs["messages"] == [{"role": "user", "content": "hi"}]
+
+
+@pytest.mark.anyio
+async def test_openai_generate_propagates_api_error():
+    client = _openai_client()
+    client.chat.completions.create = AsyncMock(side_effect=Exception("api down"))
+
+    provider = OpenAIProvider({"model": "gpt-4", "openai_api_key": "k"})
+    provider.client = client
+    with pytest.raises(Exception, match="api down"):
+        await provider.generate(GenerateRequest(question="Q"))
+
+
+@pytest.mark.anyio
+async def test_anthropic_generate_stream():
+    client = MagicMock()
+
+    class FakeTextStream:
+        def __init__(self):
+            self._items = iter(["An", "thropic"])
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            try:
+                return next(self._items)
+            except StopIteration:
+                raise StopAsyncIteration
+
+    class FakeStreamCtx:
+        def __init__(self):
+            self.text_stream = FakeTextStream()
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+    client.messages.stream.return_value = FakeStreamCtx()
+
+    provider = AnthropicProvider({"model": "claude-3"})
+    provider.client = client
+    collected = [
+        chunk async for chunk in provider.generate_stream(GenerateRequest(question="Q"))
+    ]
+    assert collected == ["An", "thropic"]
+
+
+@pytest.mark.anyio
+async def test_anthropic_chat_filters_non_user_assistant():
+    client = MagicMock()
+    resp = SimpleNamespace(content=[SimpleNamespace(text="reply")])
+    client.messages.create = AsyncMock(return_value=resp)
+
+    provider = AnthropicProvider({"model": "claude-3"})
+    provider.client = client
+    reply = await provider.chat(
+        [
+            ChatMessage(role="system", content="sys"),
+            ChatMessage(role="user", content="hi"),
+            ChatMessage(role="assistant", content="prev"),
+        ]
+    )
+    assert reply == "reply"
+    kwargs = client.messages.create.await_args.kwargs
+    assert kwargs["messages"] == [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "prev"},
+    ]
+
+
+@pytest.mark.anyio
+async def test_ollama_generate_with_usage():
+    client = _openai_client()
+    resp = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="O"))],
+        usage=SimpleNamespace(prompt_tokens=3, completion_tokens=4, total_tokens=7),
+    )
+    client.chat.completions.create = AsyncMock(return_value=resp)
+
+    provider = OllamaProvider({"base_url": "http://localhost:11434"})
+    provider.client = client
+    result = await provider.generate(GenerateRequest(question="Q"))
+    assert result.answer == "O"
+    assert result.prompt_tokens == 3
+    assert result.completion_tokens == 4
+    assert result.total_tokens == 7
+
+
+@pytest.mark.anyio
+async def test_ollama_chat():
+    client = _openai_client()
+    resp = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="chat O"))]
+    )
+    client.chat.completions.create = AsyncMock(return_value=resp)
+
+    provider = OllamaProvider({"base_url": "http://localhost:11434"})
+    provider.client = client
+    reply = await provider.chat([ChatMessage(role="user", content="hi")])
+    assert reply == "chat O"
+
+
+@pytest.mark.anyio
+async def test_ollama_generate_stream_skips_empty_deltas():
+    client = _openai_client()
+    chunk1 = SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content="A"))]
+    )
+    chunk2 = SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content="B"))]
+    )
+    chunk3 = SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content=None))]
+    )
+
+    async def _aiter():
+        for c in (chunk1, chunk2, chunk3):
+            yield c
+
+    client.chat.completions.create = AsyncMock(return_value=_aiter())
+
+    provider = OllamaProvider({"base_url": "http://localhost:11434"})
+    provider.client = client
+    collected = [
+        chunk async for chunk in provider.generate_stream(GenerateRequest(question="Q"))
+    ]
+    assert collected == ["A", "B"]
+
+
+@pytest.mark.anyio
+@patch("python_llm.custom.openai.AsyncOpenAI")
+async def test_custom_chat(mock_openai_cls):
+    client = _openai_client()
+    resp = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="chat C"))]
+    )
+    client.chat.completions.create = AsyncMock(return_value=resp)
+    mock_openai_cls.return_value = client
+
+    provider = CustomProvider({"model": "m", "custom_base_url": "http://c"})
+    provider.client = client
+    reply = await provider.chat([ChatMessage(role="user", content="hi")])
+    assert reply == "chat C"
+
+
+@pytest.mark.anyio
+@patch("python_llm.custom.openai.AsyncOpenAI")
+async def test_custom_generate_stream(mock_openai_cls):
+    client = _openai_client()
+    chunk1 = SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content="C1"))]
+    )
+    chunk2 = SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content="C2"))]
+    )
+
+    async def _aiter():
+        for c in (chunk1, chunk2):
+            yield c
+
+    client.chat.completions.create = AsyncMock(return_value=_aiter())
+    mock_openai_cls.return_value = client
+
+    provider = CustomProvider({"model": "m", "custom_base_url": "http://c"})
+    provider.client = client
+    collected = [
+        chunk async for chunk in provider.generate_stream(GenerateRequest(question="Q"))
+    ]
+    assert collected == ["C1", "C2"]

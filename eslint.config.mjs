@@ -26,7 +26,11 @@ export default [
       "**/coverage/**",
       "**/node_modules/**",
       "**/.turbo/**",
-      "**/src/**/*.e2e-spec.ts",
+      // TS wird statisch über `tsc --noEmit` geprüft (typescript-eslint
+      // unterstützt TS7 derzeit nicht). ESLint überspringt daher alle
+      // TypeScript-Quellen.
+      "**/*.ts",
+      "**/*.tsx",
     ],
   },
   {

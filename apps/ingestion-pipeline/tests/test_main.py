@@ -102,3 +102,42 @@ def test_check(client):
     resp = c.post("/check")
     assert resp.status_code == 200
     assert resp.json()["needs_update"] is True
+
+
+def test_status_uninitialized(monkeypatch):
+    monkeypatch.setattr(ingestion, "ingestion_service", None)
+    c = TestClient(ingestion.app)
+    assert c.get("/status").status_code == 503
+
+
+def test_ingest_uninitialized(monkeypatch):
+    monkeypatch.setattr(ingestion, "ingestion_task", None)
+    c = TestClient(ingestion.app)
+    assert c.post("/ingest", json={}).status_code == 503
+
+
+def test_ingest_sync_uninitialized(monkeypatch):
+    monkeypatch.setattr(ingestion, "ingestion_task", None)
+    c = TestClient(ingestion.app)
+    assert c.post("/ingest/sync", json={}).status_code == 503
+
+
+def test_check_uninitialized(monkeypatch):
+    monkeypatch.setattr(ingestion, "ingestion_service", None)
+    c = TestClient(ingestion.app)
+    assert c.post("/check").status_code == 503
+
+
+def test_ingest_sync_error_propagates(client):
+    c, _svc, task = client
+    task.run.side_effect = Exception("boom")
+    with pytest.raises(Exception, match="boom"):
+        c.post("/ingest/sync", json={})
+
+
+async def test_push_documents_no_docs(monkeypatch):
+    service = MagicMock()
+    service.documents = []
+    monkeypatch.setattr(ingestion, "ingestion_service", service)
+    result = await ingestion._push_documents_to_retrieval()
+    assert result is None

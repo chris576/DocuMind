@@ -6,13 +6,17 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    setupFiles: [],
+    setupFiles: ["./tests/setup.ts"],
+    exclude: ["node_modules/**", "dist/**", "coverage/**", ".git/**"],
     coverage: {
-      // Coverage wird berichtet; die harte 75%-Schwelle für die großen
-      // UI-Apps wird erst mit der Container-/E2E-Infrastruktur aktiviert.
       provider: "v8",
       reporter: ["text", "text-summary"],
       include: ["src/**"],
+      thresholds: {
+        lines: 75,
+        functions: 75,
+        statements: 75,
+      },
     },
   },
 });

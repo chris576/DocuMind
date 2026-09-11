@@ -132,3 +132,22 @@ def test_load_vector_db_config_similarity_metric_env(monkeypatch):
     cfg = load_vector_db_config()
     assert cfg.similarity_metric == "euclidean"
     assert cfg.to_vector_db_config()["similarity_metric"] == "euclidean"
+
+
+def test_load_vector_db_config_keyword_and_provider_env(monkeypatch):
+    monkeypatch.setenv("KEYWORD_METHOD", "local")
+    monkeypatch.setenv("KEYWORD_WEIGHT", "0.5")
+    monkeypatch.setenv("SEMANTIC_WEIGHT", "0.4")
+    monkeypatch.setenv("FTS_LANGUAGE", "english")
+    monkeypatch.setenv("KEYWORD_INDEX_FILE", "/tmp/kw.pkl")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "custom_emb")
+    monkeypatch.setenv("RERANKER_PROVIDER", "custom_reranker")
+
+    cfg = load_vector_db_config()
+    assert cfg.keyword_method == "local"
+    assert cfg.keyword_weight == 0.5
+    assert cfg.semantic_weight == 0.4
+    assert cfg.fts_language == "english"
+    assert cfg.keyword_index_file == "/tmp/kw.pkl"
+    assert cfg.embedding_provider == "custom_emb"
+    assert cfg.reranker_provider == "custom_reranker"

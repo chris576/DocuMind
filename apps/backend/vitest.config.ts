@@ -4,11 +4,16 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    exclude: ["node_modules/**", "dist/**", "coverage/**", ".git/**"],
     coverage: {
-      // Bessere Android-Umgebung für die Nest-basierte Integration, sonst .coverage
       provider: "v8",
       reporter: ["text", "text-summary"],
       include: ["src/**"],
+      thresholds: {
+        lines: 75,
+        functions: 75,
+        statements: 75,
+      },
     },
   },
 });

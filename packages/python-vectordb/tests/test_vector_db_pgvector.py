@@ -157,6 +157,57 @@ def test_delete_documents_calls_delete(mock_connect):
     assert "DELETE FROM documents" in cursor.execute.call_args.args[0]
 
 
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_delete_documents_empty_is_noop(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    mock_connect.return_value = conn
+
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.connection = conn
+    adapter.delete_documents([])
+    cursor.execute.assert_not_called()
+    conn.commit.assert_not_called()
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_add_documents_batches_over_100(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    mock_connect.return_value = conn
+
+    provider = MagicMock()
+
+    def encode_texts(texts):
+        return [MagicMock(tolist=lambda: [0.1]) for _ in texts]
+
+    provider.encode_texts.side_effect = encode_texts
+
+    adapter = PgVectorVectorDB(
+        {
+            "url": "postgresql://u:p@localhost/db",
+            "collection": "documents",
+            "embedding_dimension": 1,
+        },
+        provider,
+    )
+    adapter.ready = True
+    adapter.connection = conn
+
+    docs = [
+        VectorDBDocument(id=str(i), title=f"t{i}", content=f"c{i}")
+        for i in range(250)
+    ]
+    adapter.add_documents(docs)
+
+    # 250 Dokumente -> 3 Batches -> 3 Commits, aber 250 Einzel-Inserts.
+    assert conn.commit.call_count == 3
+    assert cursor.execute.call_count == 250
+
+
 def test_get_status_not_ready():
     adapter = _adapter()
     assert adapter.get_status() == {"ready": False, "document_count": 0}

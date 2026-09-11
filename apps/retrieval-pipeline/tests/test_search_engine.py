@@ -238,3 +238,84 @@ def test_get_status_initialized():
     status = engine.get_status()
     assert status["initialized"] is True
     assert status["vector_db_ready"] is True
+
+
+def test_semantic_search_caps_top_k_at_100():
+    engine = _engine()
+    engine.vector_db = MagicMock()
+    engine.vector_db.ask.return_value = []
+
+    engine.semantic_search("q", top_k=500)
+    from python_vectordb.vector_db import HybridSearchQuery
+
+    ask_args = engine.vector_db.ask.call_args.args[0]
+    assert isinstance(ask_args, HybridSearchQuery)
+    assert ask_args.top_k == 100
+
+
+def test_hybrid_search_passes_large_top_k_uncapped():
+    engine = _engine()
+    engine.vector_db = MagicMock()
+    engine.vector_db.ask.return_value = []
+
+    engine.hybrid_search("q", top_k=500)
+    from python_vectordb.vector_db import HybridSearchQuery
+
+    ask_args = engine.vector_db.ask.call_args.args[0]
+    assert isinstance(ask_args, HybridSearchQuery)
+    assert ask_args.top_k == 500
+
+
+@patch("src.search_engine.RerankerFactory.create")
+def test_search_filters_exclude_dates_and_correspondent(mock_reranker):
+    mock_reranker.return_value = MagicMock()
+    engine = _engine()
+    engine.initialize()
+    engine.vector_db = MagicMock()
+    engine.vector_db.ask.return_value = [
+        MagicMock(
+            id="1",
+            title="old",
+            content="c",
+            score=0.9,
+            metadata={"correspondent": "ACME", "created": "2023-01-01"},
+        ),
+        MagicMock(
+            id="2",
+            title="new",
+            content="c",
+            score=0.8,
+            metadata={"correspondent": "ACME", "created": "2025-01-01"},
+        ),
+        MagicMock(
+            id="3",
+            title="other",
+            content="c",
+            score=0.7,
+            metadata={"correspondent": "Beta", "created": "2024-06-01"},
+        ),
+    ]
+    engine.reranker = MagicMock()
+    engine.reranker.rerank.side_effect = lambda q, results, k: results[:k]
+
+    req = SearchRequest(query="q", from_date="2024-01-01", to_date="2024-12-31", correspondent="acme")
+    results = engine.search(req)
+    assert results == []
+
+
+def test_create_snippet_exception_fallback():
+    engine = _engine()
+    # query=None löst im try eine Exception aus -> Fallback content[:max_len] + "..."
+    snippet = engine.create_snippet(None, "hello world", max_len=5)
+    assert snippet == "hello..."
+
+
+@patch("src.search_engine.RerankerFactory.create")
+def test_rerank_results_handles_generator(mock_reranker):
+    mock_reranker.return_value = MagicMock()
+    engine = _engine()
+    engine.reranker = MagicMock()
+    engine.reranker.rerank.return_value = ({"title": "a"} for _ in range(1))
+
+    out = engine.rerank_results("q", [{"title": "a"}, {"title": "b"}], top_k=5)
+    assert out == [{"title": "a"}]

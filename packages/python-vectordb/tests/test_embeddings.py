@@ -57,6 +57,33 @@ def test_embedding_factory_custom_model(mock_model_cls):
     mock_model_cls.assert_called_once_with("custom")
 
 
+@patch("python_vectordb.embeddings.sentence_transformer.SentenceTransformer")
+def test_sentence_transformer_applies_e5_prefixes(mock_model_cls):
+    model = MagicMock()
+    model.get_sentence_embedding_dimension.return_value = 384
+
+    def fake_encode(value):
+        if isinstance(value, str):
+            return MagicMock(tolist=lambda: [0.1] * 384)
+        return MagicMock(tolist=lambda: [[0.1] * 384])
+
+    model.encode.side_effect = fake_encode
+    mock_model_cls.return_value = model
+
+    provider = SentenceTransformerEmbeddingProvider("e5-small-multilingual")
+    assert provider.query_prefix == "query: "
+    assert provider.passage_prefix == "passage: "
+
+    provider.encode_texts(["doc"])
+    provider.encode_query("q")
+
+    # encode_texts bekommt die passage-prefixed Liste, encode_query den query-prefixed Str.
+    assert model.encode.call_args_list[0].args[0] == ["passage: doc"]
+    assert model.encode.call_args_list[1].args[0] == "query: q"
+    # Alias wurde auf die volle HF-Modell-ID aufgelöst.
+    mock_model_cls.assert_called_once_with("intfloat/multilingual-e5-small")
+
+
 def test_embedding_factory_unknown():
     with pytest.raises(ValueError, match="Unknown embedding provider"):
         EmbeddingProviderFactory.create({"embedding_provider": "nope"})

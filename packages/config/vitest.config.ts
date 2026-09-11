@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     setupFiles: ["./tests/setup.ts"],
+    unstubEnvs: true,
     coverage: {
       provider: "v8",
       reporter: ["text", "text-summary"],

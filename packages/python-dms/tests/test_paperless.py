@@ -231,3 +231,84 @@ def test_build_lookup_failure_falls_back_to_empty(mock_get):
     provider = make_provider()
     assert provider._build_lookup("tags") == {}
     assert provider._build_custom_fields_lookup() == {}
+
+
+def test_headers_contains_authorization():
+    provider = make_provider()
+    headers = provider._headers()
+    assert headers["Authorization"] == "Token secret"
+    assert headers["Accept"] == "application/json; version=10"
+
+
+def test_get_str_returns_first_non_empty():
+    assert PaperlessDocumentProvider._get_str(
+        {"url": "http://a", "paperless_api_url": "http://b"},
+        ("url", "paperless_api_url"),
+    ) == "http://a"
+    assert PaperlessDocumentProvider._get_str(
+        {"url": "", "paperless_api_url": "http://b"},
+        ("url", "paperless_api_url"),
+    ) == "http://b"
+    assert PaperlessDocumentProvider._get_str({}, ("url",)) == ""
+
+
+def test_resolve_name_none_returns_empty():
+    assert PaperlessDocumentProvider._resolve_name({1: "X"}, None) == ""
+    assert PaperlessDocumentProvider._resolve_name({1: "X"}, 1) == "X"
+    assert PaperlessDocumentProvider._resolve_name({}, 2) == ""
+
+
+def test_normalize_custom_fields_scalar_passthrough():
+    lookup = {7: {"name": "k", "data_type": "string"}}
+    flat = PaperlessDocumentProvider._normalize_custom_fields(
+        [
+            {"field": 7, "value": "text"},
+            {"field": 8, "value": 123},
+            {"field": 9, "value": 1.5},
+            {"field": 10, "value": True},
+        ],
+        lookup,
+    )
+    assert flat["custom_fields.k"] == "text"
+    assert flat["custom_fields.id_8"] == 123
+    assert flat["custom_fields.id_9"] == 1.5
+    assert flat["custom_fields.id_10"] is True
+
+
+@patch("python_dms.paperless.requests.get")
+def test_fetch_documents_hash_fallback(mock_get):
+    def fake_get(url, headers=None, params=None, timeout=30):
+        resp = MagicMock()
+        resp.status_code = 200
+        if "documents/" in url:
+            resp.json.return_value = {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "T",
+                        "content": "C",
+                        "correspondent": None,
+                        "tags": [],
+                        "document_type": None,
+                        "storage_path": None,
+                        "created": "",
+                        "modified": "",
+                        "custom_fields": [],
+                        # kein checksum -> compute_hash-Fallback
+                    }
+                ],
+                "next": None,
+            }
+        else:
+            resp.json.return_value = {"results": [], "next": None}
+        return resp
+
+    mock_get.side_effect = fake_get
+
+    provider = make_provider()
+    docs = provider.fetch_documents()
+    assert len(docs) == 1
+    expected_hash = PaperlessDocumentProvider.compute_hash(
+        {"title": "T", "content": "C", "correspondent": ""}
+    )
+    assert docs[0].hash == expected_hash

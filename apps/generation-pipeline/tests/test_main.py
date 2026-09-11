@@ -186,3 +186,84 @@ def test_lifespan_sets_provider(monkeypatch):
 
     with TestClient(generation.app) as test_client:
         assert test_client.get("/health").status_code == 200
+
+
+def test_generate_stream_error_chunk(client):
+    c, provider = client
+
+    async def _err_aiter():
+        yield "partial"
+        raise RuntimeError("stream boom")
+
+    provider.generate_stream = MagicMock(return_value=_err_aiter())
+
+    with c.stream("POST", "/generate/stream", json={"question": "Q"}) as resp:
+        body = "".join(resp.iter_text())
+
+    assert "[ERROR]" in body
+    assert "stream boom" in body
+    assert "[DONE]" in body
+
+
+def test_chat_message_stream_error_chunk(client):
+    c, provider = client
+
+    async def _err_aiter():
+        yield "partial"
+        raise RuntimeError("chat boom")
+
+    provider.generate_stream = MagicMock(return_value=_err_aiter())
+    init = c.post("/chat/init", json={"document_id": 1})
+    chat_id = init.json()["chat_id"]
+
+    with c.stream("POST", "/chat/message/stream", json={"chat_id": chat_id, "message": "hi"}) as resp:
+        body = "".join(resp.iter_text())
+
+    assert "[ERROR]" in body
+    assert "chat boom" in body
+    assert "[DONE]" in body
+
+
+def test_chat_message_uninitialized(monkeypatch):
+    monkeypatch.setattr(generation, "llm_provider", None)
+    monkeypatch.setattr(generation, "chat_sessions", {})
+    c = TestClient(generation.app)
+
+    init = c.post("/chat/init", json={"document_id": 1})
+    chat_id = init.json()["chat_id"]
+    resp = c.post("/chat/message", json={"chat_id": chat_id, "message": "hi"})
+    assert resp.status_code == 503
+
+
+def test_chat_message_stream_uninitialized(monkeypatch):
+    monkeypatch.setattr(generation, "llm_provider", None)
+    monkeypatch.setattr(generation, "chat_sessions", {})
+    c = TestClient(generation.app)
+
+    init = c.post("/chat/init", json={"document_id": 1})
+    chat_id = init.json()["chat_id"]
+    resp = c.post("/chat/message/stream", json={"chat_id": chat_id, "message": "hi"})
+    assert resp.status_code == 503
+
+
+def test_chat_init_truncates_long_content(client):
+    c, _provider = client
+    long_content = "x" * 3000
+    resp = c.post(
+        "/chat/init",
+        json={"document_id": 1, "document_title": "Doc", "document_content": long_content},
+    )
+    assert resp.status_code == 200
+    chat_id = resp.json()["chat_id"]
+    system_content = generation.chat_sessions[chat_id]["history"][0].content
+    assert system_content.endswith("x" * 2000)
+    assert "x" * 2001 not in system_content
+
+
+async def test_augment_with_retrieval_context_exception(monkeypatch):
+    monkeypatch.setattr(generation, "post_json", AsyncMock(side_effect=RuntimeError("ctx down")))
+
+    request = generation.GenerateRequest(question="Q")
+    result = await generation._augment_with_retrieval_context(request)
+    assert result is request
+    assert result.context == ""

@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "lint": "eslint src/",
+    "lint": "eslint \"src/**/*.{js,mjs,cjs}\" --no-error-on-unmatched-pattern",
     "test": "vitest run --coverage",
     "test:unit": "vitest run --coverage",
     "typecheck": "tsc --noEmit"

@@ -135,3 +135,31 @@ def test_get_status_initialized():
     assert status["status"] == "ok"
     assert status["documents_count"] == 1
     assert status["indexed_documents"] == 1
+
+
+def test_load_documents_check_new_extends_documents():
+    svc, provider, _bus = _service()
+    svc.documents = [_doc("1")]
+    svc.indexed_document_ids = {"1"}
+    provider.fetch_documents.return_value = [_doc("1"), _doc("2")]
+
+    docs = svc.load_documents(check_new=True)
+    assert [d.id for d in docs] == ["1", "2"]
+    assert svc.documents[1].id == "2"
+
+
+def test_load_documents_without_refresh_keeps_documents():
+    svc, provider, _bus = _service()
+    svc.documents = [_doc("1")]
+
+    docs = svc.load_documents()
+    assert [d.id for d in docs] == ["1"]
+    provider.fetch_documents.assert_not_called()
+
+
+def test_check_for_updates_non_latest_message():
+    svc, provider, _bus = _service()
+    provider.check_for_updates.return_value = (True, "2 neue Dokumente gefunden")
+    ok, msg = svc.check_for_updates()
+    assert ok is True
+    assert msg == "2 neue Dokumente gefunden"

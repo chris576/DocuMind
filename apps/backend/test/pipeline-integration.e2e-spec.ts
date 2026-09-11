@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IngestionModule } from '../src/ingestion/ingestion.module';
 import { RetrievalModule } from '../src/retrieval/retrieval.module';
 import { GenerationModule } from '../src/generation/generation.module';
+import { HealthModule } from '../src/health/health.module';
 
 // Env VOR der Modul-Konstruktion setzen: die Services lesen die
 // Pipeline-URLs im Konstruktor.
@@ -16,7 +17,7 @@ process.env.GENERATION_PIPELINE_URL = 'http://127.0.0.1:8003';
 
 // DB-freies Test-Modul: nur die drei HTTP-Proxy-Module (keine Auth, kein Postgres).
 @Module({
-  imports: [IngestionModule, RetrievalModule, GenerationModule],
+  imports: [IngestionModule, RetrievalModule, GenerationModule, HealthModule],
 })
 class IntegrationTestModule {}
 
@@ -97,5 +98,87 @@ describe('Backend ↔ Pipelines (Integration)', () => {
 
     expect(res.body.status).toBe('initialized');
     expect(res.body.chat_id).toBeTruthy();
+  });
+
+  it('löst die synchrone Indexierung über die Ingestion-Pipeline aus', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/ingestion/run/sync')
+      .send({ force: true, checkNew: false })
+      .expect(201);
+
+    expect(res.body.status).toBe('completed');
+    expect(res.body.processed).toBe(2);
+  });
+
+  it('liefert den Retrieval-Kontext für eine Frage', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/retrieval/context')
+      .send({ question: 'Rechnung', maxSources: 2 })
+      .expect(201);
+
+    expect(res.body.query).toBe('Rechnung');
+    expect(res.body.context).toContain('Rechnung 2024-001');
+    expect(Array.isArray(res.body.sources)).toBe(true);
+  });
+
+  it('liefert den Status der Retrieval-Pipeline', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/retrieval/status')
+      .expect(200);
+
+    expect(res.body.initialized).toBe(true);
+  });
+
+  it('liefert den eigenen Health-Status des Backends', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/health')
+      .expect(200);
+
+    expect(res.body.status).toBe('ok');
+    expect(res.body.service).toBe('dms-rag-backend');
+  });
+
+  it('streamt die Antwort über SSE (ask/stream)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/generation/ask/stream')
+      .send({ question: 'Wann ist die Rechnung fällig?' })
+      .expect(201)
+      .expect('Content-Type', /text\/event-stream/);
+
+    expect(res.text).toContain('data: ');
+    expect(res.text).toContain('[DONE]');
+  });
+
+  it('sendet eine Chat-Nachricht über die Generation-Pipeline', async () => {
+    const init = await request(app.getHttpServer())
+      .post('/api/generation/chat/init')
+      .send({ documentId: 1 })
+      .expect(201);
+    const chatId = init.body.chat_id;
+
+    const res = await request(app.getHttpServer())
+      .post('/api/generation/chat/message')
+      .send({ chatId, message: 'Hallo' })
+      .expect(201);
+
+    expect(res.body.chat_id).toBe(chatId);
+    expect(res.body.role).toBe('assistant');
+    expect(res.body.message).toBeTruthy();
+  });
+
+  it('streamt eine Chat-Antwort über SSE (chat/message/stream)', async () => {
+    const init = await request(app.getHttpServer())
+      .post('/api/generation/chat/init')
+      .send({ documentId: 1 })
+      .expect(201);
+    const chatId = init.body.chat_id;
+
+    const res = await request(app.getHttpServer())
+      .post('/api/generation/chat/message/stream')
+      .send({ chatId, message: 'Hallo' })
+      .expect(201)
+      .expect('Content-Type', /text\/event-stream/);
+
+    expect(res.text).toContain('[DONE]');
   });
 });

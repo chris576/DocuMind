@@ -1,4 +1,5 @@
 """Unit tests for the ChromaVectorDB adapter (mocked client)."""
+import pickle
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -140,6 +141,68 @@ def test_search_maps_results():
     assert results[0].title == "t1"
     assert results[0].content == "content1"
     assert abs(results[0].score - 0.8) < 1e-9
+
+
+def test_search_missing_distances_defaults_zero():
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.collection = MagicMock()
+    adapter.collection.query.return_value = {
+        "ids": [[1]],
+        "metadatas": [[{"title": "t1"}]],
+        "documents": [["content1"]],
+        # kein "distances"-Schlüssel in der Antwort
+    }
+
+    results = adapter.search("q")
+    assert len(results) == 1
+    assert results[0].score == 1.0
+
+
+def test_add_documents_batches_over_100(monkeypatch):
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.collection = MagicMock()
+    monkeypatch.setattr(adapter, "_rebuild_local_index", lambda docs: None)
+
+    def encode_texts(texts):
+        return [[0.1, 0.2, 0.3] for _ in texts]
+
+    adapter.embedding_provider.encode_texts.side_effect = encode_texts
+
+    docs = [
+        VectorDBDocument(id=str(i), title=f"t{i}", content=f"c{i}")
+        for i in range(250)
+    ]
+    adapter.add_documents(docs)
+
+    # 250 Dokumente -> 3 Batches (100, 100, 50).
+    assert adapter.collection.upsert.call_count == 3
+    assert len(adapter.collection.upsert.call_args_list[0].kwargs["ids"]) == 100
+    assert len(adapter.collection.upsert.call_args_list[2].kwargs["ids"]) == 50
+
+
+def test_load_local_index_restores_state(tmp_path):
+    index_file = tmp_path / "bm25.pkl"
+    index_file.write_bytes(
+        pickle.dumps(
+            {
+                "documents": [{"id": "1", "title": "t", "content": "c"}],
+                "tokenized_corpus": [["t", "c"]],
+            }
+        )
+    )
+
+    adapter = _adapter(keyword_index_file=str(index_file))
+    assert adapter._load_local_index() is True
+    assert adapter._keyword_documents == [{"id": "1", "title": "t", "content": "c"}]
+    assert adapter._tokenized_corpus == [["t", "c"]]
+    assert adapter._bm25 is not None
+
+
+def test_load_local_index_missing_file(tmp_path):
+    adapter = _adapter(keyword_index_file=str(tmp_path / "missing.pkl"))
+    assert adapter._load_local_index() is False
 
 
 def test_delete_collection_requires_client():

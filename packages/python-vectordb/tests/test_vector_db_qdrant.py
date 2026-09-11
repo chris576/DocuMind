@@ -178,6 +178,35 @@ def test_to_point_id():
     assert str(mapped) != ""
 
 
+def test_to_point_id_int_input_passthrough():
+    assert _to_point_id(42) == 42
+
+
+def test_add_documents_batches_over_100():
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.client = MagicMock()
+
+    provider = MagicMock()
+
+    def encode_texts(texts):
+        return [[0.1, 0.2, 0.3] for _ in texts]
+
+    provider.encode_texts.side_effect = encode_texts
+    adapter.embedding_provider = provider
+
+    docs = [
+        VectorDBDocument(id=str(i), title=f"t{i}", content=f"c{i}")
+        for i in range(250)
+    ]
+    adapter.add_documents(docs)
+
+    # 250 Dokumente -> 3 Batches (100, 100, 50).
+    assert adapter.client.upsert.call_count == 3
+    assert len(adapter.client.upsert.call_args_list[0].kwargs["points"]) == 100
+    assert len(adapter.client.upsert.call_args_list[2].kwargs["points"]) == 50
+
+
 def test_default_metric_is_cosine():
     adapter = _adapter()
     assert adapter.similarity_metric == "cosine"
