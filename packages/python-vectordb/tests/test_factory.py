@@ -49,3 +49,14 @@ def test_create_full_access(mock_embed):
 
 def test_factory_registry_contains_all():
     assert set(VectorDBFactory._REGISTRY) == {"chroma", "qdrant", "pgvector"}
+
+
+@patch("python_vectordb.vector_db.factory.EmbeddingProviderFactory.create")
+def test_create_writers_shares_embedding(mock_embed):
+    mock_embed.return_value = MagicMock(dimension=384)
+    writers = VectorDBFactory.create_writers({"type": "chroma"}, ["c1", "c2"])
+    assert set(writers) == {"c1", "c2"}
+    # The embedding model is loaded exactly once, not once per collection.
+    assert mock_embed.call_count == 1
+    for bus in writers.values():
+        assert isinstance(bus, VectorDBCommandBus)

@@ -61,6 +61,32 @@ describe("AppConfigService", () => {
     });
   });
 
+  it("resolves the connectors slice from configured connectors", () => {
+    const service = new AppConfigService();
+    service.saveConfig({
+      connectors: [
+        { id: "paperless", type: "paperless", enabled: true, url: "http://p:8000" },
+        { id: "obsidian", type: "docspell", enabled: true, collection: "obs_vault" },
+      ],
+    });
+    const slice = service.getSlice("connectors") as Array<Record<string, unknown>>;
+    expect(slice).toHaveLength(2);
+    expect(slice[0]).toMatchObject({ id: "paperless", collection: "paperless" });
+    expect(slice[1]).toMatchObject({ id: "obsidian", collection: "obs_vault" });
+  });
+
+  it("returns an env-fallback connector when none configured", () => {
+    const service = new AppConfigService();
+    const slice = service.getSlice("connectors") as Array<Record<string, unknown>>;
+    expect(slice).toHaveLength(1);
+    expect(slice[0]).toMatchObject({
+      id: "paperless",
+      type: "paperless",
+      url: "http://paperless:8000",
+      token: "secret-token",
+    });
+  });
+
   it("returns 404 for an unknown slice", () => {
     const service = new AppConfigService();
     expect(() => service.getSlice("nope")).toThrow(HttpException);
@@ -85,7 +111,7 @@ describe("AppConfigService", () => {
     service.saveConfig({
       vectorDb: { pgvectorUrl: "postgresql://user:***@host:5432/db" },
     });
-    const slice = service.getSlice("vector-db");
+    const slice = service.getSlice("vector-db") as Record<string, unknown>;
     expect(slice.pgvector_url).toBe("postgresql://user:realpass@host:5432/db");
   });
 });

@@ -7,45 +7,79 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from python_common.config_client import fetch_config_slice
 from python_dms import DocumentProviderFactory
-from python_dms.config import DMSConfig, load_dms_config
+from python_dms.config import load_dms_config
 from python_vectordb.config import VectorDBConfig, load_vector_db_config
 from python_vectordb.vector_db import VectorDBFactory
 
+from src.coordinator import IngestionCoordinator, IngestionTarget
 from src.ingestion_service import IngestionService
 from src.models import IngestionRequest
-from src.tasks import IngestionTask
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("ingestion")
 
-# Global instances
-ingestion_service: IngestionService | None = None
-ingestion_task: IngestionTask | None = None
+# Global coordinator (multi-target). Built in the lifespan.
+coordinator: IngestionCoordinator | None = None
+
+
+def _env_fallback_connectors(vector_db_config: VectorDBConfig) -> list[dict]:
+    """Single Paperless connector derived from env when the gateway is absent."""
+    dms_config = load_dms_config()
+    return [
+        {
+            "id": "paperless",
+            "type": dms_config.document_provider,
+            "url": dms_config.document_provider_url,
+            "token": dms_config.document_provider_token,
+            "collection": vector_db_config.collection_name,
+        }
+    ]
+
+
+def _build_coordinator(connectors: list[dict], vector_db_config: VectorDBConfig) -> IngestionCoordinator:
+    collections = [c.get("collection") or c.get("id") or "documents" for c in connectors]
+    writers = VectorDBFactory.create_writers(
+        vector_db_config.to_vector_db_config(), collections
+    )
+
+    targets = []
+    for connector in connectors:
+        collection = connector.get("collection") or connector.get("id") or "documents"
+        provider = DocumentProviderFactory.create(
+            {
+                "type": connector.get("type", "paperless"),
+                "url": connector.get("url"),
+                "token": connector.get("token"),
+            }
+        )
+        targets.append(
+            IngestionTarget(
+                id=connector.get("id", collection),
+                collection=collection,
+                service=IngestionService(provider, writers[collection]),
+            )
+        )
+
+    return IngestionCoordinator(targets)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ingestion_service, ingestion_task
+    global coordinator
 
     logger.info("Starting Ingestion Pipeline")
 
-    dms_config = load_dms_config()
     vector_db_config = load_vector_db_config()
 
     # Admin-Panel config (gateway) overrides env; env remains fallback.
-    dms_slice = await fetch_config_slice("dms")
-    if dms_slice:
-        dms_config = DMSConfig(**{**asdict(dms_config), **dms_slice})
     vector_slice = await fetch_config_slice("vector-db")
     if vector_slice:
         vector_db_config = VectorDBConfig(**{**asdict(vector_db_config), **vector_slice})
+    connectors = await fetch_config_slice("connectors")
+    if not connectors:
+        connectors = _env_fallback_connectors(vector_db_config)
 
-    # Write-only vector database access (CQRS): ingestion never reads.
-    vector_db = VectorDBFactory.create_writer(vector_db_config.to_vector_db_config())
-    document_provider = DocumentProviderFactory.create(dms_config.to_document_provider_config())
-
-    ingestion_service = IngestionService(document_provider, vector_db)
-    ingestion_task = IngestionTask(ingestion_service)
+    coordinator = _build_coordinator(list(connectors), vector_db_config)
 
     yield
 
@@ -65,29 +99,31 @@ app.add_middleware(
 
 @app.get("/status")
 async def status():
-    if ingestion_service is None:
+    if coordinator is None:
         raise HTTPException(status_code=503, detail="Ingestion service not initialized")
-    return ingestion_service.get_status()
+    return coordinator.get_status()
 
 
 @app.get("/health")
 async def health():
+    healthy = bool(coordinator) and bool(coordinator.targets) and all(
+        target.service.is_initialized for target in coordinator.targets
+    )
     return {
-        "status": "healthy" if ingestion_service and ingestion_service.is_initialized else "unhealthy",
+        "status": "healthy" if healthy else "unhealthy",
         "service": "ingestion-pipeline",
     }
 
 
 async def _push_documents_to_retrieval():
-    """Compatibility notification to the retrieval pipeline (deprecated).
-
-    The keyword index is now maintained on the ingestion write path (the same
-    IndexDocumentsCommand feeds the adapter's keyword channel). This routine
-    only logs; it no longer triggers a BM25 rebuild on the read side.
-    """
-    if ingestion_service is None:
+    """Compatibility notification to the retrieval pipeline (deprecated)."""
+    if coordinator is None:
         return
-    documents = [asdict(doc) for doc in ingestion_service.documents]
+    documents = [
+        asdict(doc)
+        for target in coordinator.targets
+        for doc in target.service.documents
+    ]
 
     if not documents:
         logger.info("No documents to push to retrieval pipeline")
@@ -100,12 +136,12 @@ async def _push_documents_to_retrieval():
 
 
 async def _run_ingestion_and_push(force_update: bool, check_new: bool):
-    """Run ingestion and, on success, notify the retrieval pipeline."""
-    if ingestion_task is None:
-        logger.error("Ingestion task not initialized; cannot run")
+    """Run ingestion across all targets and, on success, notify retrieval."""
+    if coordinator is None:
+        logger.error("Ingestion coordinator not initialized; cannot run")
         return
     try:
-        result = ingestion_task.run(force_update=force_update, check_new=check_new)
+        result = coordinator.run(force_update=force_update, check_new=check_new)
         if result.get("status") == "completed":
             await _push_documents_to_retrieval()
     except Exception as e:
@@ -114,9 +150,9 @@ async def _run_ingestion_and_push(force_update: bool, check_new: bool):
 
 @app.post("/ingest")
 async def ingest(request: IngestionRequest, background_tasks: BackgroundTasks):
-    if ingestion_task is None:
-        raise HTTPException(status_code=503, detail="Ingestion task not initialized")
-    if ingestion_task.running:
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="Ingestion service not initialized")
+    if coordinator.running:
         return {"status": "running", "message": "Ingestion already in progress"}
 
     background_tasks.add_task(_run_ingestion_and_push, request.force, request.check_new)
@@ -126,12 +162,12 @@ async def ingest(request: IngestionRequest, background_tasks: BackgroundTasks):
 
 @app.post("/ingest/sync")
 async def ingest_sync(request: IngestionRequest):
-    if ingestion_task is None:
-        raise HTTPException(status_code=503, detail="Ingestion task not initialized")
-    if ingestion_task.running:
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="Ingestion service not initialized")
+    if coordinator.running:
         return {"status": "running", "message": "Ingestion already in progress"}
 
-    result = ingestion_task.run(force_update=request.force, check_new=request.check_new)
+    result = coordinator.run(force_update=request.force, check_new=request.check_new)
     if result.get("status") == "completed":
         await _push_documents_to_retrieval()
     return result
@@ -139,9 +175,9 @@ async def ingest_sync(request: IngestionRequest):
 
 @app.post("/check")
 async def check_updates():
-    if ingestion_service is None:
+    if coordinator is None:
         raise HTTPException(status_code=503, detail="Ingestion service not initialized")
-    needs_update, message = ingestion_service.check_for_updates()
+    needs_update, message = coordinator.check_for_updates()
     return {"needs_update": needs_update, "message": message}
 
 

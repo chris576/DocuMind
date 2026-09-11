@@ -1,4 +1,4 @@
-from typing import Any, Dict, Type
+from typing import Any, Dict, List, Type
 
 from ..embeddings import EmbeddingProviderFactory
 from .base import BaseVectorDB
@@ -26,7 +26,7 @@ class VectorDBFactory:
     }
 
     @staticmethod
-    def _create_adapter(config: Dict[str, Any]) -> BaseVectorDB:
+    def _create_adapter(config: Dict[str, Any], embedding_provider=None) -> BaseVectorDB:
         db_type = config.get("type", "chroma").lower()
 
         adapter_class = VectorDBFactory._REGISTRY.get(db_type)
@@ -37,7 +37,8 @@ class VectorDBFactory:
                 f"Supported types: {supported}"
             )
 
-        embedding_provider = EmbeddingProviderFactory.create(config)
+        if embedding_provider is None:
+            embedding_provider = EmbeddingProviderFactory.create(config)
 
         # Echte Dimension aus dem Provider übernehmen (768/1024 statt Default 384),
         # damit Modelle mit abweichender Dimension korrekt angelegt werden.
@@ -50,6 +51,24 @@ class VectorDBFactory:
     def create_writer(config: Dict[str, Any]) -> VectorDBCommandBus:
         """Create a write-only command bus (for the ingestion pipeline)."""
         return VectorDBCommandBus(writer=VectorDBFactory._create_adapter(config))
+
+    @staticmethod
+    def create_writers(
+        config: Dict[str, Any], collections: List[str]
+    ) -> Dict[str, VectorDBCommandBus]:
+        """Create one write-only bus per collection, sharing a single embedding provider.
+
+        The embedding model is loaded once and reused across all collections,
+        avoiding N× memory/time when one ingestion process serves many sources.
+        """
+        embedding_provider = EmbeddingProviderFactory.create(config)
+        writers: Dict[str, VectorDBCommandBus] = {}
+        for collection in collections:
+            adapter_config = dict(config)
+            adapter_config["collection"] = collection
+            adapter = VectorDBFactory._create_adapter(adapter_config, embedding_provider)
+            writers[collection] = VectorDBCommandBus(writer=adapter)
+        return writers
 
     @staticmethod
     def create_reader(config: Dict[str, Any]) -> VectorDBCommandBus:

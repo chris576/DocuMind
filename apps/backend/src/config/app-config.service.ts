@@ -31,12 +31,14 @@ export class AppConfigService {
     return this.redactSecrets(this.config);
   }
 
-  getSlice(name: string): Record<string, unknown> {
+  getSlice(name: string): unknown {
     switch (name) {
       case 'llm':
         return this.llmSlice(this.config);
       case 'dms':
         return this.dmsSlice(this.config);
+      case 'connectors':
+        return this.connectorsSlice(this.config);
       case 'vector-db':
         return this.vectorDbSlice(this.config);
       case 'retrieval':
@@ -99,6 +101,40 @@ export class AppConfigService {
       document_provider_token:
         this.resolveEnv(connector?.tokenEnv) ?? process.env.PAPERLESS_API_TOKEN,
     };
+  }
+
+  private connectorsSlice(c: DocuMindConfig): Record<string, unknown>[] {
+    const enabled = c.connectors.filter((x) => x.enabled);
+    const connectors = enabled.length > 0 ? enabled : c.connectors;
+
+    if (connectors.length === 0) {
+      // Env fallback: a single Paperless connector.
+      return [
+        {
+          id: 'paperless',
+          type: 'paperless',
+          enabled: true,
+          url:
+            process.env.PAPERLESS_API_URL ?? process.env.DOCUMENT_PROVIDER_URL,
+          token:
+            process.env.PAPERLESS_API_TOKEN ?? process.env.DOCUMENT_PROVIDER_TOKEN,
+          collection: process.env.COLLECTION_NAME ?? 'documents',
+        },
+      ];
+    }
+
+    return connectors.map((conn) => ({
+      id: conn.id,
+      type: conn.type,
+      enabled: conn.enabled,
+      url:
+        conn.url ??
+        (conn.type === 'paperless' ? process.env.PAPERLESS_API_URL : undefined),
+      token:
+        this.resolveEnv(conn.tokenEnv) ??
+        (conn.type === 'paperless' ? process.env.PAPERLESS_API_TOKEN : undefined),
+      collection: conn.collection ?? conn.id,
+    }));
   }
 
   private vectorDbSlice(c: DocuMindConfig): Record<string, unknown> {
