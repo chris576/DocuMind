@@ -8,18 +8,34 @@ import type {
   ChatInitRequestDto,
   ChatMessageRequestDto,
 } from '@documind/shared';
+import {
+  PipelineRegistry,
+  type ResolvedPipeline,
+} from '../pipelines/pipeline-registry';
 
 @Injectable()
 export class GenerationService {
-  private readonly generationUrl =
-    process.env.GENERATION_PIPELINE_URL || 'http://localhost:8003';
+  constructor(
+    private httpService: HttpService,
+    private registry: PipelineRegistry,
+  ) {}
 
-  constructor(private httpService: HttpService) {}
+  private resolve(namespace?: string): ResolvedPipeline {
+    try {
+      return this.registry.resolve(namespace);
+    } catch (error) {
+      throw new HttpException(
+        (error as Error).message,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 
   async ask(dto: AskRequestDto): Promise<AskResponseDto> {
+    const pipeline = this.resolve(dto.namespace);
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.generationUrl}/generate`, {
+        this.httpService.post(`${pipeline.generationUrl}/generate`, {
           question: dto.question,
           max_tokens: dto.maxTokens,
           temperature: dto.temperature,
@@ -43,10 +59,11 @@ export class GenerationService {
   }
 
   async askStream(dto: AskRequestDto): Promise<Readable> {
+    const pipeline = this.resolve(dto.namespace);
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          `${this.generationUrl}/generate/stream`,
+          `${pipeline.generationUrl}/generate/stream`,
           {
             question: dto.question,
             max_tokens: dto.maxTokens,
@@ -62,9 +79,10 @@ export class GenerationService {
   }
 
   async getStatus() {
+    const pipeline = this.resolve();
     try {
       const response = await firstValueFrom(
-        this.httpService.get(`${this.generationUrl}/status`),
+        this.httpService.get(`${pipeline.generationUrl}/status`),
       );
       return response.data;
     } catch (error) {
@@ -76,9 +94,10 @@ export class GenerationService {
   }
 
   async chatInit(dto: ChatInitRequestDto) {
+    const pipeline = this.resolve(dto.namespace);
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.generationUrl}/chat/init`, {
+        this.httpService.post(`${pipeline.generationUrl}/chat/init`, {
           document_id: dto.documentId,
           document_title: dto.documentTitle,
           document_content: dto.documentContent,
@@ -94,9 +113,10 @@ export class GenerationService {
   }
 
   async chatMessage(dto: ChatMessageRequestDto) {
+    const pipeline = this.resolve(dto.namespace);
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.generationUrl}/chat/message`, {
+        this.httpService.post(`${pipeline.generationUrl}/chat/message`, {
           chat_id: dto.chatId,
           message: dto.message,
         }),
@@ -108,10 +128,11 @@ export class GenerationService {
   }
 
   async chatMessageStream(dto: ChatMessageRequestDto): Promise<Readable> {
+    const pipeline = this.resolve(dto.namespace);
     try {
       const response = await firstValueFrom(
         this.httpService.post(
-          `${this.generationUrl}/chat/message/stream`,
+          `${pipeline.generationUrl}/chat/message/stream`,
           { chat_id: dto.chatId, message: dto.message },
           { responseType: 'stream' },
         ),

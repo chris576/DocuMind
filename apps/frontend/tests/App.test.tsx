@@ -10,9 +10,6 @@ vi.mock("../src/api", () => ({
   getRetrievalStatus: vi.fn().mockResolvedValue({ ready: true }),
   getGenerationStatus: vi.fn().mockResolvedValue({ status: "ok" }),
   searchDocuments: vi.fn(),
-  askQuestion: vi.fn(),
-  runIngestion: vi.fn(),
-  runIngestionSync: vi.fn(),
 }));
 
 describe("App", () => {

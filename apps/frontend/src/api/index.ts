@@ -1,8 +1,5 @@
 import { apiClient } from './client';
 import type {
-  AskRequestDto,
-  AskResponseDto,
-  IngestionRunDto,
   SearchRequestDto,
   SearchResult,
 } from '@documind/shared';
@@ -11,21 +8,6 @@ export async function searchDocuments(
   dto: SearchRequestDto,
 ): Promise<SearchResult[]> {
   const { data } = await apiClient.post('/api/retrieval/search', dto);
-  return data;
-}
-
-export async function askQuestion(dto: AskRequestDto): Promise<AskResponseDto> {
-  const { data } = await apiClient.post('/api/generation/ask', dto);
-  return data;
-}
-
-export async function runIngestion(dto: IngestionRunDto) {
-  const { data } = await apiClient.post('/api/ingestion/run', dto);
-  return data;
-}
-
-export async function runIngestionSync(dto: IngestionRunDto) {
-  const { data } = await apiClient.post('/api/ingestion/run/sync', dto);
   return data;
 }
 
@@ -41,5 +23,15 @@ export async function getRetrievalStatus() {
 
 export async function getGenerationStatus() {
   const { data } = await apiClient.get('/api/generation/status');
+  return data;
+}
+
+export async function getConfig(): Promise<unknown> {
+  const { data } = await apiClient.get('/api/config');
+  return data;
+}
+
+export async function saveConfig(config: unknown): Promise<unknown> {
+  const { data } = await apiClient.put('/api/config', config);
   return data;
 }

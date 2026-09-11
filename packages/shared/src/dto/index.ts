@@ -2,6 +2,7 @@ import { SearchResult } from '../types/index.js';
 
 export interface SearchRequestDto {
   query: string;
+  namespace?: string;
   fromDate?: string;
   toDate?: string;
   correspondent?: string;
@@ -10,6 +11,7 @@ export interface SearchRequestDto {
 
 export interface AskRequestDto {
   question: string;
+  namespace?: string;
   maxTokens?: number;
   temperature?: number;
 }
@@ -29,6 +31,7 @@ export interface AskResponseDto {
 export interface IngestionRunDto {
   force?: boolean;
   checkNew?: boolean;
+  namespace?: string;
 }
 
 export interface IngestionStatusDto {
@@ -43,6 +46,7 @@ export interface ChatInitRequestDto {
   documentId?: number;
   documentTitle?: string;
   documentContent?: string;
+  namespace?: string;
 }
 
 export interface ChatInitResponseDto {
@@ -53,6 +57,7 @@ export interface ChatInitResponseDto {
 export interface ChatMessageRequestDto {
   chatId: string;
   message: string;
+  namespace?: string;
 }
 
 export interface ChatMessageResponseDto {

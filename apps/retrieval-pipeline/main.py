@@ -1,10 +1,12 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from python_vectordb.config import load_vector_db_config
+from python_common.config_client import fetch_config_slice
+from python_vectordb.config import VectorDBConfig, load_vector_db_config
 
 from src.models import (
     ContextRequest,
@@ -29,14 +31,22 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Retrieval Pipeline")
 
     vector_db_config = load_vector_db_config()
+
+    # Admin-Panel config (gateway) overrides env; env remains fallback.
+    vector_slice = await fetch_config_slice("vector-db")
+    if vector_slice:
+        vector_db_config = VectorDBConfig(**{**asdict(vector_db_config), **vector_slice})
+    retrieval_slice = await fetch_config_slice("retrieval")
+    max_results = (
+        int(retrieval_slice["max_results"])
+        if retrieval_slice and retrieval_slice.get("max_results")
+        else int(os.getenv("MAX_RESULTS", "20"))
+    )
+
     # Reuse the shared config projection (includes keyword method/weights +
     # FTS language). Only pipeline-specific knobs stay env-driven.
     config = vector_db_config.to_vector_db_config()
-    config.update(
-        {
-            "max_results": int(os.getenv("MAX_RESULTS", "20")),
-        }
-    )
+    config.update({"max_results": max_results})
 
     search_engine = SearchEngine(config)
     search_engine.initialize()

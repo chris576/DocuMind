@@ -43,11 +43,15 @@ services:
       - RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:${RETRIEVAL_PORT:-8002}
       - GENERATION_PIPELINE_URL=http://generation-pipeline:${GENERATION_PORT:-8003}
       - EXTERNAL_API_ENABLED=${EXTERNAL_API_ENABLED:-false}
+      - CONFIG_FILE=/data/config.json
+      - GATEWAY_API_TOKEN=${GATEWAY_API_TOKEN:-}
     depends_on:
       - postgres
       - chromadb
       - qdrant
       - pgvector
+    volumes:
+      - ./config:/data
     networks:
       - paperless-network
 
@@ -61,6 +65,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=${INGESTION_PORT:-8001}
+      - GATEWAY_URL=http://backend:3001
       - PAPERLESS_API_URL=${PAPERLESS_API_URL}
       - PAPERLESS_API_TOKEN=${PAPERLESS_API_TOKEN}
       - DOCUMENT_PROVIDER=${DOCUMENT_PROVIDER:-paperless}
@@ -89,6 +94,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=${RETRIEVAL_PORT:-8002}
+      - GATEWAY_URL=http://backend:3001
       - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-sentence_transformer}
       - RERANKER_PROVIDER=${RERANKER_PROVIDER:-cross_encoder}
@@ -113,6 +119,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=${GENERATION_PORT:-8003}
+      - GATEWAY_URL=http://backend:3001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OLLAMA_API_URL=${OLLAMA_API_URL:-http://localhost:11434}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}

@@ -43,6 +43,10 @@ const envSchema = z.object({
   RETRIEVAL_PIPELINE_URL: z.string().default('http://localhost:8002'),
   GENERATION_PIPELINE_URL: z.string().default('http://localhost:8003'),
 
+  // Gateway / MCP
+  GATEWAY_API_TOKEN: z.string().optional(),
+  PIPELINE_REGISTRY_JSON: z.string().optional(),
+
   // Pipeline-Ports (Container/Netzwerk + Host/publiziert)
   INGESTION_PORT: z.string().default('8001'),
   RETRIEVAL_PORT: z.string().default('8002'),

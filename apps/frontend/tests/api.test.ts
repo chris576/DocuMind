@@ -26,34 +26,6 @@ describe("api", () => {
     });
   });
 
-  it("askQuestion posts to /api/generation/ask", async () => {
-    mockedPost.mockResolvedValue({ data: { answer: "A" } });
-    const result = await api.askQuestion({ question: "Q" });
-    expect(result).toEqual({ answer: "A" });
-    expect(mockedPost).toHaveBeenCalledWith("/api/generation/ask", {
-      question: "Q",
-    });
-  });
-
-  it("runIngestion posts to /api/ingestion/run", async () => {
-    mockedPost.mockResolvedValue({ data: { status: "started" } });
-    const result = await api.runIngestion({ force: true, checkNew: false });
-    expect(result).toEqual({ status: "started" });
-    expect(mockedPost).toHaveBeenCalledWith("/api/ingestion/run", {
-      force: true,
-      checkNew: false,
-    });
-  });
-
-  it("runIngestionSync posts to /api/ingestion/run/sync", async () => {
-    mockedPost.mockResolvedValue({ data: { status: "completed" } });
-    const result = await api.runIngestionSync({ force: false });
-    expect(result).toEqual({ status: "completed" });
-    expect(mockedPost).toHaveBeenCalledWith("/api/ingestion/run/sync", {
-      force: false,
-    });
-  });
-
   it("getIngestionStatus gets /api/ingestion/status", async () => {
     mockedGet.mockResolvedValue({ data: { initialized: true } });
     const result = await api.getIngestionStatus();

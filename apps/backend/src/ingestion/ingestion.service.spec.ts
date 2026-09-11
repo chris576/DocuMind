@@ -4,14 +4,18 @@ import { of, throwError } from "rxjs";
 import { describe, expect, it, vi } from "vitest";
 
 import { IngestionService } from "./ingestion.service";
+import { IngestionJobStore } from "./job-store";
+import { PipelineRegistry } from "../pipelines/pipeline-registry";
 
 function createService() {
   const httpService = {
     post: vi.fn(),
     get: vi.fn(),
   } as unknown as HttpService;
-  const service = new IngestionService(httpService);
-  return { service, httpService };
+  const registry = new PipelineRegistry();
+  const jobStore = new IngestionJobStore();
+  const service = new IngestionService(httpService, registry, jobStore);
+  return { service, httpService, jobStore };
 }
 
 async function expectBadGateway(promise: Promise<unknown>) {
@@ -21,14 +25,16 @@ async function expectBadGateway(promise: Promise<unknown>) {
 }
 
 describe("IngestionService", () => {
-  it("run posts to /ingest and returns data", async () => {
+  it("run posts to /ingest and returns a running job", async () => {
     const { service, httpService } = createService();
     (httpService.post as any).mockReturnValue(
-      of({ data: { status: "started" } }),
+      of({ data: { status: "started", message: "started" } }),
     );
 
     const result = await service.run({ force: true, checkNew: true });
-    expect(result).toEqual({ status: "started" });
+    expect(result.id).toBeTruthy();
+    expect(result.namespace).toBe("paperless");
+    expect(result.status).toBe("running");
     expect(httpService.post).toHaveBeenCalledWith(
       "http://localhost:8001/ingest",
       { force: true, check_new: true },
@@ -93,5 +99,12 @@ describe("IngestionService", () => {
       throwError(() => new Error("down")),
     );
     await expectBadGateway(service.getStatus());
+  });
+
+  it("getJob throws 404 for an unknown id", async () => {
+    const { service } = createService();
+    const err = (await service.getJob("nope").catch((e) => e)) as HttpException;
+    expect(err).toBeInstanceOf(HttpException);
+    expect(err.getStatus()).toBe(HttpStatus.NOT_FOUND);
   });
 });

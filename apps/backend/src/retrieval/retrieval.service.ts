@@ -2,18 +2,34 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import type { SearchRequestDto, SearchResult } from '@documind/shared';
+import {
+  PipelineRegistry,
+  type ResolvedPipeline,
+} from '../pipelines/pipeline-registry';
 
 @Injectable()
 export class RetrievalService {
-  private readonly retrievalUrl =
-    process.env.RETRIEVAL_PIPELINE_URL || 'http://localhost:8002';
+  constructor(
+    private httpService: HttpService,
+    private registry: PipelineRegistry,
+  ) {}
 
-  constructor(private httpService: HttpService) {}
+  private resolve(namespace?: string): ResolvedPipeline {
+    try {
+      return this.registry.resolve(namespace);
+    } catch (error) {
+      throw new HttpException(
+        (error as Error).message,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 
   async search(dto: SearchRequestDto): Promise<SearchResult[]> {
+    const pipeline = this.resolve(dto.namespace);
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.retrievalUrl}/search`, {
+        this.httpService.post(`${pipeline.retrievalUrl}/search`, {
           query: dto.query,
           from_date: dto.fromDate,
           to_date: dto.toDate,
@@ -27,10 +43,11 @@ export class RetrievalService {
     }
   }
 
-  async getContext(question: string, maxSources = 5) {
+  async getContext(question: string, maxSources = 5, namespace?: string) {
+    const pipeline = this.resolve(namespace);
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.retrievalUrl}/context`, {
+        this.httpService.post(`${pipeline.retrievalUrl}/context`, {
           question,
           max_sources: maxSources,
         }),
@@ -45,9 +62,10 @@ export class RetrievalService {
   }
 
   async getStatus() {
+    const pipeline = this.resolve();
     try {
       const response = await firstValueFrom(
-        this.httpService.get(`${this.retrievalUrl}/status`),
+        this.httpService.get(`${pipeline.retrievalUrl}/status`),
       );
       return response.data;
     } catch (error) {

@@ -13,7 +13,7 @@ describe("Layout", () => {
     );
 
     expect(screen.getByText("DocuMind")).toBeInTheDocument();
-    for (const name of ["Dashboard", "Suche", "Frage/Antwort", "Ingestion"]) {
+    for (const name of ["Dashboard", "Suche", "Einstellungen"]) {
       expect(screen.getByRole("link", { name: new RegExp(name) })).toBeInTheDocument();
     }
   });

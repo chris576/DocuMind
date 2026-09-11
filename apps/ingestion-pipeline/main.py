@@ -5,9 +5,10 @@ from dataclasses import asdict
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from python_common.config_client import fetch_config_slice
 from python_dms import DocumentProviderFactory
-from python_dms.config import load_dms_config
-from python_vectordb.config import load_vector_db_config
+from python_dms.config import DMSConfig, load_dms_config
+from python_vectordb.config import VectorDBConfig, load_vector_db_config
 from python_vectordb.vector_db import VectorDBFactory
 
 from src.ingestion_service import IngestionService
@@ -30,6 +31,14 @@ async def lifespan(app: FastAPI):
 
     dms_config = load_dms_config()
     vector_db_config = load_vector_db_config()
+
+    # Admin-Panel config (gateway) overrides env; env remains fallback.
+    dms_slice = await fetch_config_slice("dms")
+    if dms_slice:
+        dms_config = DMSConfig(**{**asdict(dms_config), **dms_slice})
+    vector_slice = await fetch_config_slice("vector-db")
+    if vector_slice:
+        vector_db_config = VectorDBConfig(**{**asdict(vector_db_config), **vector_slice})
 
     # Write-only vector database access (CQRS): ingestion never reads.
     vector_db = VectorDBFactory.create_writer(vector_db_config.to_vector_db_config())

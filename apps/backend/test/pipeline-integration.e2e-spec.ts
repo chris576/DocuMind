@@ -44,7 +44,8 @@ describe('Backend ↔ Pipelines (Integration)', () => {
       .send({ force: false, checkNew: true })
       .expect(201);
 
-    expect(res.body.status).toBe('started');
+    expect(res.body.id).toBeTruthy();
+    expect(res.body.status).toBe('running');
   });
 
   it('liefert den Indexierungs-Status der Ingestion-Pipeline', async () => {

@@ -4,8 +4,7 @@ import { useState } from 'react';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
   { name: 'Suche', href: '/search', icon: '🔍' },
-  { name: 'Frage/Antwort', href: '/ask', icon: '✨' },
-  { name: 'Ingestion', href: '/ingestion', icon: '📥' },
+  { name: 'Einstellungen', href: '/settings', icon: '⚙️' },
 ];
 
 export default function Layout() {

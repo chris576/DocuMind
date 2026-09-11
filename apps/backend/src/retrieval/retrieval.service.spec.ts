@@ -4,13 +4,15 @@ import { of, throwError } from "rxjs";
 import { describe, expect, it, vi } from "vitest";
 
 import { RetrievalService } from "./retrieval.service";
+import { PipelineRegistry } from "../pipelines/pipeline-registry";
 
 function createService() {
   const httpService = {
     post: vi.fn(),
     get: vi.fn(),
   } as unknown as HttpService;
-  const service = new RetrievalService(httpService);
+  const registry = new PipelineRegistry();
+  const service = new RetrievalService(httpService, registry);
   return { service, httpService };
 }
 

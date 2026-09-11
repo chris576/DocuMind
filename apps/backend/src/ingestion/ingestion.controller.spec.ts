@@ -8,6 +8,8 @@ function createController() {
     run: vi.fn(),
     runSync: vi.fn(),
     getStatus: vi.fn(),
+    getJob: vi.fn(),
+    listJobs: vi.fn(),
   } as unknown as IngestionService;
   const controller = new IngestionController(service);
   return { controller, service };
@@ -39,5 +41,23 @@ describe("IngestionController", () => {
     const result = await controller.getStatus();
     expect(result).toEqual({ initialized: true });
     expect(service.getStatus).toHaveBeenCalled();
+  });
+
+  it("getJob delegates to service", async () => {
+    const { controller, service } = createController();
+    (service.getJob as any).mockResolvedValue({ id: "j1", status: "running" });
+
+    const result = await controller.getJob("j1");
+    expect(result).toEqual({ id: "j1", status: "running" });
+    expect(service.getJob).toHaveBeenCalledWith("j1");
+  });
+
+  it("listJobs delegates to service", async () => {
+    const { controller, service } = createController();
+    (service.listJobs as any).mockResolvedValue([]);
+
+    const result = await controller.listJobs();
+    expect(result).toEqual([]);
+    expect(service.listJobs).toHaveBeenCalled();
   });
 });

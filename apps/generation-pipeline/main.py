@@ -2,6 +2,7 @@ import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from typing import Dict
 
 from fastapi import FastAPI, HTTPException
@@ -10,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from python_common.env import get_env
 from python_common.http import post_json
+from python_common.config_client import fetch_config_slice
 from python_llm import (
     BaseLLMProvider,
     ChatMessage,
@@ -17,7 +19,7 @@ from python_llm import (
     GenerateResponse,
     LLMProviderFactory,
 )
-from python_llm.config import load_llm_config
+from python_llm.config import LLMConfig, load_llm_config
 
 from src.models import ChatInitRequest, ChatMessageRequest
 
@@ -43,6 +45,12 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Generation Pipeline")
 
     llm_config = load_llm_config()
+
+    # Admin-Panel config (gateway) overrides env; env remains fallback.
+    llm_slice = await fetch_config_slice("llm")
+    if llm_slice:
+        llm_config = LLMConfig(**{**asdict(llm_config), **llm_slice})
+
     llm_provider = LLMProviderFactory.create(llm_config.provider, llm_config.to_provider_config())
     logger.info(f"Initialized LLM provider: {llm_config.provider}")
 

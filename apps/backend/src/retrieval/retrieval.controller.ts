@@ -16,8 +16,14 @@ export class RetrievalController {
 
   @Post('context')
   @ApiOperation({ summary: 'Build retrieval context for a question' })
-  async getContext(@Body() body: { question: string; maxSources?: number }) {
-    return this.retrievalService.getContext(body.question, body.maxSources);
+  async getContext(
+    @Body() body: { question: string; maxSources?: number; namespace?: string },
+  ) {
+    return this.retrievalService.getContext(
+      body.question,
+      body.maxSources,
+      body.namespace,
+    );
   }
 
   @Get('status')
