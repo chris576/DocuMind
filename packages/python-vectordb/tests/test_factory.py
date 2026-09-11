@@ -60,3 +60,23 @@ def test_create_writers_shares_embedding(mock_embed):
     assert mock_embed.call_count == 1
     for bus in writers.values():
         assert isinstance(bus, VectorDBCommandBus)
+
+
+@patch("python_vectordb.vector_db.factory.EmbeddingProviderFactory.create")
+def test_create_readers_shares_embedding(mock_embed):
+    with patch(
+        "python_vectordb.vector_db.factory.VectorDBFactory._create_adapter"
+    ) as mock_create:
+        mock_adapter = MagicMock()
+        mock_adapter.initialize.return_value = True
+        mock_create.return_value = mock_adapter
+
+        readers = VectorDBFactory.create_readers({"type": "chroma"}, ["c1", "c2"])
+        assert set(readers) == {"c1", "c2"}
+        # One embedding provider, shared across the per-collection readers.
+        assert mock_embed.call_count == 1
+        # One adapter per collection, each initialized eagerly.
+        assert mock_create.call_count == 2
+        assert mock_adapter.initialize.call_count == 2
+        for bus in readers.values():
+            assert isinstance(bus, VectorDBCommandBus)

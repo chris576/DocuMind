@@ -9,6 +9,7 @@ class SearchRequest(BaseModel):
     to_date: str | None = None
     correspondent: str | None = None
     max_results: int = 20
+    collections: List[str] = []
 
 
 class SearchResult(BaseModel):
@@ -25,6 +26,7 @@ class SearchResult(BaseModel):
 class ContextRequest(BaseModel):
     question: str
     max_sources: int = 5
+    collections: List[str] = []
 
 
 class ContextResponse(BaseModel):

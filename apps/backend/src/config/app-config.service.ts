@@ -31,6 +31,10 @@ export class AppConfigService {
     return this.redactSecrets(this.config);
   }
 
+  getCollections(): string[] {
+    return this.connectorsSlice(this.config).map((c) => c.collection as string);
+  }
+
   getSlice(name: string): unknown {
     switch (name) {
       case 'llm':
@@ -39,6 +43,8 @@ export class AppConfigService {
         return this.dmsSlice(this.config);
       case 'connectors':
         return this.connectorsSlice(this.config);
+      case 'collections':
+        return this.getCollections();
       case 'vector-db':
         return this.vectorDbSlice(this.config);
       case 'retrieval':

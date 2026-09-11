@@ -75,6 +75,17 @@ describe("RetrievalService", () => {
     );
   });
 
+  it("search forwards collections when provided", async () => {
+    const { service, httpService } = createService();
+    (httpService.post as any).mockReturnValue(of({ data: [] }));
+
+    await service.search({ query: "q", collections: ["a", "b"] });
+    expect(httpService.post).toHaveBeenCalledWith(
+      "http://localhost:8002/search",
+      expect.objectContaining({ collections: ["a", "b"] }),
+    );
+  });
+
   it("search returns empty array when pipeline returns a non-array", async () => {
     const { service, httpService } = createService();
     (httpService.post as any).mockReturnValue(of({ data: { not: "array" } }));

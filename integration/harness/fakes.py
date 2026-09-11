@@ -29,6 +29,7 @@ class FakeSearchEngine:
                 "snippet": "Zahlungsziel 14 Tage netto.",
                 "doc_id": 1,
                 "content": "Rechnung über 120,00 EUR.",
+                "collection": "paperless",
             },
             {
                 "title": "Vertrag Muster",
@@ -38,6 +39,7 @@ class FakeSearchEngine:
                 "snippet": "Laufzeit 12 Monate.",
                 "doc_id": 2,
                 "content": "Rahmenvertrag.",
+                "collection": "obs_vault",
             },
         ]
 
@@ -52,9 +54,20 @@ class FakeSearchEngine:
         # Lazy-Import: der Harness hat das Pipeline-Verzeichnis bereits auf
         # sys.path gesetzt. Rückgabe als echte SearchResult-Objekte, weil der
         # /context-Endpoint auf Attribute (result.title, ...) zugreift.
+        # Jedes Fake-Dokument gehört einer Collection an, damit die
+        # Collection-Filterung über den Gateway testbar ist.
         from src.models import SearchResult
 
-        return [SearchResult(**r) for r in self._results]
+        collections = getattr(request, "collections", None) or []
+        filtered = [
+            r
+            for r in self._results
+            if not collections or r.get("collection") in collections
+        ]
+        return [
+            SearchResult(**{k: v for k, v in r.items() if k != "collection"})
+            for r in filtered
+        ]
 
     def get_status(self) -> Dict[str, Any]:
         return {
@@ -99,6 +112,7 @@ class FakeIngestionService:
 
     is_initialized = True
     documents: List[Any] = []
+    indexed_document_ids: List[Any] = []
 
     def get_status(self) -> Dict[str, Any]:
         return {

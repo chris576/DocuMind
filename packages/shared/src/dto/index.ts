@@ -3,6 +3,7 @@ import { SearchResult } from '../types/index.js';
 export interface SearchRequestDto {
   query: string;
   namespace?: string;
+  collections?: string[];
   fromDate?: string;
   toDate?: string;
   correspondent?: string;

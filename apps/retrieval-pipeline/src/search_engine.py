@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List
+from typing import Dict, List
 
 from python_vectordb.reranking import Reranker, RerankerFactory
 from python_vectordb.vector_db import (
@@ -23,6 +23,7 @@ class SearchEngine:
         self.qdrant_api_key = config.get("qdrant_api_key")
         self.pgvector_url = config.get("pgvector_url")
         self.collection_name = config.get("collection_name", "documents")
+        self.collections: List[str] = config.get("collections") or [self.collection_name]
         self.embedding_model_name = config.get("embedding_model", "paraphrase-multilingual-MiniLM-L12-v2")
         self.embedding_provider = config.get("embedding_provider", "sentence_transformer")
         self.similarity_metric = config.get("similarity_metric", "cosine")
@@ -31,6 +32,7 @@ class SearchEngine:
 
         # Foreign (untyped) object; declared Any so mypy does not flag access.
         self.vector_db: VectorDBCommandBus | None = None
+        self.readers: Dict[str, VectorDBCommandBus] = {}
         self.is_initialized = False
 
         self.reranker: Reranker | None = None
@@ -75,27 +77,42 @@ class SearchEngine:
 
     def setup_vector_db(self) -> bool:
         try:
-            if self.vector_db is None:
-                self.vector_db = VectorDBFactory.create_reader(self._vector_db_config())
+            if not self.readers:
+                self.readers = VectorDBFactory.create_readers(self._vector_db_config(), self.collections)
+                if self.readers:
+                    # Keep the single-reader attribute for backward compatibility.
+                    self.vector_db = next(iter(self.readers.values()))
 
-            status = self.vector_db.ask(GetStatusQuery())
-            logger.info(f"Loaded vector database with {status.get('document_count', 0)} documents")
-            self.status.chroma_ready = status.get("ready", False)
-            self.status.documents_count = status.get("document_count", 0)
+            total = 0
+            ready = True
+            for reader in self.readers.values():
+                status = reader.ask(GetStatusQuery())
+                ready = ready and bool(status.get("ready", False))
+                total += int(status.get("document_count", 0))
+            logger.info(f"Loaded {len(self.readers)} collection(s) with {total} documents")
+            self.status.chroma_ready = ready
+            self.status.documents_count = total
             return True
         except Exception as e:
             logger.error(f"Error setting up vector database: {str(e)}")
             self.status.chroma_ready = False
             return False
 
-    def semantic_search(self, query: str, top_k: int | None = None) -> List[dict]:
-        """Semantic-only search via the CQRS read bus."""
-        if not self.vector_db:
-            raise Exception("Vector database not initialized")
+    def _reader_pairs(self, collections: List[str] | None = None) -> List[tuple]:
+        """Resolve (collection_name, reader) pairs to search.
 
-        top_k = top_k or self.max_results
-        results = self.vector_db.ask(HybridSearchQuery(query=query, top_k=min(top_k, 100)))
+        Empty/None selects every known collection. Falls back to the legacy
+        single-reader attribute when no multi-collection readers exist.
+        """
+        if self.readers:
+            names = list(collections) if collections else list(self.readers.keys())
+            return [(name, self.readers[name]) for name in names if name in self.readers]
+        if self.vector_db:
+            return [(None, self.vector_db)]
+        return []
 
+    def _run_query(self, reader: VectorDBCommandBus, query: str, top_k: int) -> List[dict]:
+        results = reader.ask(HybridSearchQuery(query=query, top_k=top_k))
         documents = []
         for result in results:
             metadata = result.metadata or {}
@@ -109,37 +126,41 @@ class SearchEngine:
                     "content": result.content,
                 }
             )
-
         return documents
+
+    def _collect_results(
+        self, query: str, top_k: int | None = None, collections: List[str] | None = None
+    ) -> List[dict]:
+        top_k = top_k or self.max_results
+        merged: List[dict] = []
+        for collection, reader in self._reader_pairs(collections):
+            for doc in self._run_query(reader, query, top_k):
+                doc = dict(doc)
+                if collection is not None:
+                    doc["collection"] = collection
+                merged.append(doc)
+        return merged
+
+    def semantic_search(self, query: str, top_k: int | None = None) -> List[dict]:
+        """Semantic-only search across all collections via the CQRS read bus."""
+        if not self.vector_db and not self.readers:
+            raise Exception("Vector database not initialized")
+
+        top_k = top_k or self.max_results
+        merged: List[dict] = []
+        for collection, reader in self._reader_pairs():
+            for doc in self._run_query(reader, query, min(top_k, 100)):
+                doc = dict(doc)
+                if collection is not None:
+                    doc["collection"] = collection
+                merged.append(doc)
+        return merged
 
     def hybrid_search(self, query: str, top_k: int | None = None) -> List[dict]:
-        """Hybrid search, fully delegated to the adapter (CQRS read bus).
-
-        The adapter owns its keyword implementation (native BM25, FTS or local
-        BM25) and returns already-fused results; the engine only normalizes the
-        result shape for downstream use.
-        """
-        if not self.vector_db:
+        """Hybrid search across all collections (CQRS read bus)."""
+        if not self.vector_db and not self.readers:
             raise Exception("Vector database not initialized")
-
-        top_k = top_k or self.max_results
-        results = self.vector_db.ask(HybridSearchQuery(query=query, top_k=top_k))
-
-        documents = []
-        for result in results:
-            metadata = result.metadata or {}
-            documents.append(
-                {
-                    "id": result.id,
-                    "title": result.title,
-                    "correspondent": metadata.get("correspondent", ""),
-                    "date": metadata.get("created", ""),
-                    "score": float(result.score),
-                    "content": result.content,
-                }
-            )
-
-        return documents
+        return self._collect_results(query, top_k)
 
     def rerank_results(self, query: str, results: List[dict], top_k: int | None = None) -> List[dict]:
         if not results:
@@ -193,7 +214,7 @@ class SearchEngine:
         if not self.is_initialized:
             self.initialize()
 
-        results = self.hybrid_search(request.query, request.max_results)
+        results = self._collect_results(request.query, request.max_results, request.collections)
 
         if request.from_date or request.to_date or request.correspondent:
             filtered = []

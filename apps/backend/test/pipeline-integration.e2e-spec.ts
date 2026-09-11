@@ -15,6 +15,25 @@ process.env.INGESTION_PIPELINE_URL = 'http://127.0.0.1:8001';
 process.env.RETRIEVAL_PIPELINE_URL = 'http://127.0.0.1:8002';
 process.env.GENERATION_PIPELINE_URL = 'http://127.0.0.1:8003';
 
+// Zwei Namespaces auf dieselben Harness-URLs: damit lassen sich
+// Namespace-Routing und Collection-Filterung über den Gateway testen.
+process.env.PIPELINE_REGISTRY_JSON = JSON.stringify([
+  {
+    namespace: 'paperless',
+    collection: 'paperless',
+    ingestionUrl: 'http://127.0.0.1:8001',
+    retrievalUrl: 'http://127.0.0.1:8002',
+    generationUrl: 'http://127.0.0.1:8003',
+  },
+  {
+    namespace: 'obs_vault',
+    collection: 'obs_vault',
+    ingestionUrl: 'http://127.0.0.1:8001',
+    retrievalUrl: 'http://127.0.0.1:8002',
+    generationUrl: 'http://127.0.0.1:8003',
+  },
+]);
+
 // DB-freies Test-Modul: nur die drei HTTP-Proxy-Module (keine Auth, kein Postgres).
 @Module({
   imports: [IngestionModule, RetrievalModule, GenerationModule, HealthModule],
@@ -54,7 +73,8 @@ describe('Backend ↔ Pipelines (Integration)', () => {
       .expect(200);
 
     expect(res.body.service).toBe('ingestion-pipeline');
-    expect(res.body.initialized).toBe(true);
+    expect(Array.isArray(res.body.targets)).toBe(true);
+    expect(res.body.targets[0].initialized).toBe(true);
   });
 
   it('sucht über die Retrieval-Pipeline', async () => {
@@ -108,7 +128,8 @@ describe('Backend ↔ Pipelines (Integration)', () => {
       .expect(201);
 
     expect(res.body.status).toBe('completed');
-    expect(res.body.processed).toBe(2);
+    expect(Array.isArray(res.body.targets)).toBe(true);
+    expect(res.body.targets[0].processed).toBe(2);
   });
 
   it('liefert den Retrieval-Kontext für eine Frage', async () => {
@@ -181,5 +202,118 @@ describe('Backend ↔ Pipelines (Integration)', () => {
       .expect('Content-Type', /text\/event-stream/);
 
     expect(res.text).toContain('[DONE]');
+  });
+
+  it('liefert die Pipeline-Registry (GET /api/pipelines)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/pipelines')
+      .expect(200);
+
+    expect(res.body.namespaces).toContain('paperless');
+    expect(Array.isArray(res.body.pipelines)).toBe(true);
+  });
+
+  it('liefert den aggregierten Pipeline-Status (GET /api/pipelines/status)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/pipelines/status')
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    const entry = res.body.find((e: any) => e.namespace === 'paperless');
+    expect(entry).toBeTruthy();
+  });
+
+  it('listet Ingestion-Jobs nach einem Run (GET /api/ingestion/jobs)', async () => {
+    await request(app.getHttpServer())
+      .post('/api/ingestion/run')
+      .send({ force: false, checkNew: true })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get('/api/ingestion/jobs')
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body[0].id).toBeTruthy();
+
+    const job = await request(app.getHttpServer())
+      .get(`/api/ingestion/jobs/${res.body[0].id}`)
+      .expect(200);
+    expect(job.body.namespace).toBe('paperless');
+  });
+
+  it('routet Requests an den angegebenen Namespace', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/retrieval/search')
+      .send({ query: 'Rechnung', namespace: 'obs_vault' })
+      .expect(201);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body).toHaveLength(2);
+  });
+
+  it('lehnt unbekannte Namespaces mit 400 ab', async () => {
+    await request(app.getHttpServer())
+      .post('/api/retrieval/search')
+      .send({ query: 'x', namespace: 'unbekannt' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/api/generation/ask')
+      .send({ question: 'x', namespace: 'unbekannt' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/api/ingestion/run')
+      .send({ namespace: 'unbekannt' })
+      .expect(400);
+  });
+
+  it('schränkt die Suche auf ausgewählte Collections ein', async () => {
+    const paperless = await request(app.getHttpServer())
+      .post('/api/retrieval/search')
+      .send({ query: 'Rechnung', collections: ['paperless'] })
+      .expect(201);
+    const paperlessTitles = paperless.body.map((r: any) => r.title);
+    expect(paperlessTitles).toContain('Rechnung 2024-001');
+    expect(paperlessTitles).not.toContain('Vertrag Muster');
+
+    const obsVault = await request(app.getHttpServer())
+      .post('/api/retrieval/search')
+      .send({ query: 'Rechnung', collections: ['obs_vault'] })
+      .expect(201);
+    const obsTitles = obsVault.body.map((r: any) => r.title);
+    expect(obsTitles).toContain('Vertrag Muster');
+    expect(obsTitles).not.toContain('Rechnung 2024-001');
+  });
+
+  it('schränkt den Kontext auf ausgewählte Collections ein', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/retrieval/context')
+      .send({ question: 'Rechnung', collections: ['obs_vault'] })
+      .expect(201);
+
+    expect(res.body.context).toContain('Vertrag');
+    expect(res.body.context).not.toContain('Rechnung 2024-001');
+  });
+
+  it('markiert Jobs als completed, sobald die Pipeline fertig ist', async () => {
+    const start = await request(app.getHttpServer())
+      .post('/api/ingestion/run')
+      .send({})
+      .expect(201);
+
+    const job = await request(app.getHttpServer())
+      .get(`/api/ingestion/jobs/${start.body.id}`)
+      .expect(200);
+
+    expect(job.body.status).toBe('completed');
+  });
+
+  it('gibt 404 für unbekannte Job-IDs zurück', async () => {
+    await request(app.getHttpServer())
+      .get('/api/ingestion/jobs/gibts-nicht')
+      .expect(404);
   });
 });

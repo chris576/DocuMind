@@ -32,7 +32,7 @@ describe("RetrievalController", () => {
       maxSources: 3,
     });
     expect(result).toEqual({ context: "ctx" });
-    expect(service.getContext).toHaveBeenCalledWith("q", 3, undefined);
+    expect(service.getContext).toHaveBeenCalledWith("q", 3, undefined, undefined);
   });
 
   it("getStatus delegates to service", async () => {

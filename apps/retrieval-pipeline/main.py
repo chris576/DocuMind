@@ -42,11 +42,14 @@ async def lifespan(app: FastAPI):
         if retrieval_slice and retrieval_slice.get("max_results")
         else int(os.getenv("MAX_RESULTS", "20"))
     )
+    collections = await fetch_config_slice("collections")
+    if not collections:
+        collections = [vector_db_config.collection_name]
 
     # Reuse the shared config projection (includes keyword method/weights +
     # FTS language). Only pipeline-specific knobs stay env-driven.
     config = vector_db_config.to_vector_db_config()
-    config.update({"max_results": max_results})
+    config.update({"max_results": max_results, "collections": list(collections)})
 
     search_engine = SearchEngine(config)
     search_engine.initialize()
@@ -100,7 +103,11 @@ async def get_context(request: ContextRequest):
     if search_engine is None or not search_engine.is_initialized:
         raise HTTPException(status_code=503, detail="Search engine not initialized")
     try:
-        search_request = SearchRequest(query=request.question, max_results=request.max_sources)
+        search_request = SearchRequest(
+            query=request.question,
+            max_results=request.max_sources,
+            collections=request.collections,
+        )
         results = search_engine.search(search_request)
 
         context = ""

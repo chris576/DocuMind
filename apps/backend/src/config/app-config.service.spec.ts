@@ -87,6 +87,25 @@ describe("AppConfigService", () => {
     });
   });
 
+  it("lists collections via getCollections", () => {
+    const service = new AppConfigService();
+    service.saveConfig({
+      connectors: [
+        { id: "paperless", type: "paperless", enabled: true },
+        { id: "obsidian", type: "docspell", enabled: true, collection: "obs_vault" },
+      ],
+    });
+    expect(service.getCollections()).toEqual(["paperless", "obs_vault"]);
+  });
+
+  it("returns the collections slice", () => {
+    const service = new AppConfigService();
+    service.saveConfig({
+      connectors: [{ id: "paperless", type: "paperless", enabled: true }],
+    });
+    expect(service.getSlice("collections")).toEqual(["paperless"]);
+  });
+
   it("returns 404 for an unknown slice", () => {
     const service = new AppConfigService();
     expect(() => service.getSlice("nope")).toThrow(HttpException);

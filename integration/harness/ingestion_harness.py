@@ -10,13 +10,16 @@ sys.path.insert(0, os.path.join(ROOT, "apps", "ingestion-pipeline"))
 
 import main as ingestion  # noqa: E402
 
+import src.coordinator as coordinator_module  # noqa: E402
 from fakes import FakeIngestionService, FakeIngestionTask  # noqa: E402
 
 # Blatt-Dependencies ersetzen: keine echte DMS-/Vektor-DB-Verbindung.
-ingestion.VectorDBFactory.create_writer = lambda config: object()
+ingestion.VectorDBFactory.create_writers = lambda config, collections: {
+    c: object() for c in collections
+}
 ingestion.DocumentProviderFactory.create = lambda config: object()
 ingestion.IngestionService = lambda document_provider, vector_db: FakeIngestionService()
-ingestion.IngestionTask = lambda service: FakeIngestionTask()
+coordinator_module.IngestionTask = lambda service: FakeIngestionTask()
 
 import uvicorn  # noqa: E402
 

@@ -82,6 +82,21 @@ class VectorDBFactory:
         return VectorDBCommandBus(reader=adapter)
 
     @staticmethod
+    def create_readers(
+        config: Dict[str, Any], collections: List[str]
+    ) -> Dict[str, VectorDBCommandBus]:
+        """Create one read-only bus per collection, sharing a single embedding provider."""
+        embedding_provider = EmbeddingProviderFactory.create(config)
+        readers: Dict[str, VectorDBCommandBus] = {}
+        for collection in collections:
+            adapter_config = dict(config)
+            adapter_config["collection"] = collection
+            adapter = VectorDBFactory._create_adapter(adapter_config, embedding_provider)
+            adapter.initialize()
+            readers[collection] = VectorDBCommandBus(reader=adapter)
+        return readers
+
+    @staticmethod
     def create(config: Dict[str, Any]) -> VectorDBCommandBus:
         """Create a full-access command bus (backward-compatible convenience)."""
         adapter = VectorDBFactory._create_adapter(config)

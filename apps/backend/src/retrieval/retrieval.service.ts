@@ -28,14 +28,18 @@ export class RetrievalService {
   async search(dto: SearchRequestDto): Promise<SearchResult[]> {
     const pipeline = this.resolve(dto.namespace);
     try {
+      const body: Record<string, unknown> = {
+        query: dto.query,
+        from_date: dto.fromDate,
+        to_date: dto.toDate,
+        correspondent: dto.correspondent,
+        max_results: dto.maxResults ?? 20,
+      };
+      if (dto.collections && dto.collections.length > 0) {
+        body.collections = dto.collections;
+      }
       const response = await firstValueFrom(
-        this.httpService.post(`${pipeline.retrievalUrl}/search`, {
-          query: dto.query,
-          from_date: dto.fromDate,
-          to_date: dto.toDate,
-          correspondent: dto.correspondent,
-          max_results: dto.maxResults ?? 20,
-        }),
+        this.httpService.post(`${pipeline.retrievalUrl}/search`, body),
       );
       return this.mapResults(response.data);
     } catch (error) {
@@ -43,14 +47,23 @@ export class RetrievalService {
     }
   }
 
-  async getContext(question: string, maxSources = 5, namespace?: string) {
+  async getContext(
+    question: string,
+    maxSources = 5,
+    namespace?: string,
+    collections?: string[],
+  ) {
     const pipeline = this.resolve(namespace);
     try {
+      const body: Record<string, unknown> = {
+        question,
+        max_sources: maxSources,
+      };
+      if (collections && collections.length > 0) {
+        body.collections = collections;
+      }
       const response = await firstValueFrom(
-        this.httpService.post(`${pipeline.retrievalUrl}/context`, {
-          question,
-          max_sources: maxSources,
-        }),
+        this.httpService.post(`${pipeline.retrievalUrl}/context`, body),
       );
       return response.data;
     } catch (error) {

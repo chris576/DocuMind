@@ -10,6 +10,11 @@ export class AppConfigController {
     return this.configService.getConfig();
   }
 
+  @Get('collections')
+  listCollections() {
+    return { collections: this.configService.getCollections() };
+  }
+
   @Get('slice/:name')
   getSlice(@Param('name') name: string) {
     return this.configService.getSlice(name);

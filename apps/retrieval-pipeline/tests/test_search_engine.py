@@ -43,17 +43,43 @@ def test_initialize_failure(mock_factory):
 
 
 @patch("src.search_engine.RerankerFactory.create")
-@patch("src.search_engine.VectorDBFactory.create_reader")
+@patch("src.search_engine.VectorDBFactory.create_readers")
 def test_setup_vector_db(mock_factory, mock_reranker):
     bus = MagicMock()
     bus.ask.return_value = {"ready": True, "document_count": 5}
-    mock_factory.return_value = bus
+    mock_factory.return_value = {"docs": bus}
     mock_reranker.return_value = MagicMock()
 
     engine = _engine()
     assert engine.setup_vector_db() is True
     assert engine.status.chroma_ready is True
     assert engine.status.documents_count == 5
+
+
+def test_collect_results_restricts_collections():
+    engine = _engine(collections=["a", "b"])
+    ra = MagicMock()
+    ra.ask.return_value = [MagicMock(id="1", title="A", content="x", score=0.9, metadata={})]
+    rb = MagicMock()
+    rb.ask.return_value = [MagicMock(id="2", title="B", content="y", score=0.8, metadata={})]
+    engine.readers = {"a": ra, "b": rb}
+
+    results = engine._collect_results("q", 10, ["a"])
+    assert len(results) == 1
+    assert results[0]["collection"] == "a"
+
+
+def test_collect_results_all_collections():
+    engine = _engine(collections=["a", "b"])
+    ra = MagicMock()
+    ra.ask.return_value = [MagicMock(id="1", title="A", content="x", score=0.9, metadata={})]
+    rb = MagicMock()
+    rb.ask.return_value = [MagicMock(id="2", title="B", content="y", score=0.8, metadata={})]
+    engine.readers = {"a": ra, "b": rb}
+
+    results = engine._collect_results("q")
+    assert len(results) == 2
+    assert {r["collection"] for r in results} == {"a", "b"}
 
 
 @patch("src.search_engine.RerankerFactory.create")
