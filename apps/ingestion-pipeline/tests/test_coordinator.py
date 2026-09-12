@@ -28,9 +28,7 @@ def _target(target_id: str, collection: str) -> IngestionTarget:
 
 
 def test_run_all_targets_aggregates():
-    coordinator = IngestionCoordinator(
-        [_target("paperless", "paperless"), _target("obsidian", "obsidian")]
-    )
+    coordinator = IngestionCoordinator([_target("paperless", "paperless"), _target("obsidian", "obsidian")])
 
     result = coordinator.run()
     assert result["status"] == "completed"

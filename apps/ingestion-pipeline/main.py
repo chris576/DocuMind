@@ -38,9 +38,7 @@ def _env_fallback_connectors(vector_db_config: VectorDBConfig) -> list[dict]:
 
 def _build_coordinator(connectors: list[dict], vector_db_config: VectorDBConfig) -> IngestionCoordinator:
     collections = [c.get("collection") or c.get("id") or "documents" for c in connectors]
-    writers = VectorDBFactory.create_writers(
-        vector_db_config.to_vector_db_config(), collections
-    )
+    writers = VectorDBFactory.create_writers(vector_db_config.to_vector_db_config(), collections)
 
     targets = []
     for connector in connectors:
@@ -106,11 +104,12 @@ async def status():
 
 @app.get("/health")
 async def health():
-    healthy = bool(coordinator) and bool(coordinator.targets) and all(
-        target.service.is_initialized for target in coordinator.targets
-    )
+    coord = coordinator
+    if coord is None or not coord.targets:
+        return {"status": "unhealthy", "service": "ingestion-pipeline"}
+    is_healthy = all(target.service.is_initialized for target in coord.targets)
     return {
-        "status": "healthy" if healthy else "unhealthy",
+        "status": "healthy" if is_healthy else "unhealthy",
         "service": "ingestion-pipeline",
     }
 
@@ -119,11 +118,7 @@ async def _push_documents_to_retrieval():
     """Compatibility notification to the retrieval pipeline (deprecated)."""
     if coordinator is None:
         return
-    documents = [
-        asdict(doc)
-        for target in coordinator.targets
-        for doc in target.service.documents
-    ]
+    documents = [asdict(doc) for target in coordinator.targets for doc in target.service.documents]
 
     if not documents:
         logger.info("No documents to push to retrieval pipeline")

@@ -134,8 +134,8 @@ class SearchEngine:
         top_k = top_k or self.max_results
         merged: List[dict] = []
         for collection, reader in self._reader_pairs(collections):
-            for doc in self._run_query(reader, query, top_k):
-                doc = dict(doc)
+            for raw_doc in self._run_query(reader, query, top_k):
+                doc = dict(raw_doc)
                 if collection is not None:
                     doc["collection"] = collection
                 merged.append(doc)
@@ -149,8 +149,8 @@ class SearchEngine:
         top_k = top_k or self.max_results
         merged: List[dict] = []
         for collection, reader in self._reader_pairs():
-            for doc in self._run_query(reader, query, min(top_k, 100)):
-                doc = dict(doc)
+            for raw_doc in self._run_query(reader, query, min(top_k, 100)):
+                doc = dict(raw_doc)
                 if collection is not None:
                     doc["collection"] = collection
                 merged.append(doc)

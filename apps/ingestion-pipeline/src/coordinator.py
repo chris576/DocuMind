@@ -86,16 +86,12 @@ class IngestionCoordinator:
             }
             for target in self.targets
         ]
-        all_initialized = bool(self.targets) and all(
-            target.service.is_initialized for target in self.targets
-        )
+        all_initialized = bool(self.targets) and all(target.service.is_initialized for target in self.targets)
         return {
             "service": "ingestion-pipeline",
             "status": "ok" if all_initialized else "uninitialized",
             "documents_count": sum(len(target.service.documents) for target in self.targets),
-            "indexed_documents": sum(
-                len(target.service.indexed_document_ids) for target in self.targets
-            ),
+            "indexed_documents": sum(len(target.service.indexed_document_ids) for target in self.targets),
             "targets": targets_status,
             "running": self.running,
             "message": "",
