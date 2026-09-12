@@ -29,6 +29,10 @@ describe("validateEnv", () => {
     expect(parsed.FRONTEND_PORT).toBe("3000");
     expect(parsed.OLLAMA_API_URL).toBe("http://localhost:11434");
     expect(parsed.OLLAMA_MODEL).toBe("llama3.2");
+    expect(parsed.OPENCODE_BASE_URL).toBe("http://127.0.0.1:4096");
+    expect(parsed.OPENCODE_USERNAME).toBe("opencode");
+    expect(parsed.OPENCODE_PASSWORD).toBeUndefined();
+    expect(parsed.OPENCODE_MODEL).toBeUndefined();
     expect(parsed.CHROMA_URL).toBe("http://localhost:8000");
     expect(parsed.EXTERNAL_API_ENABLED).toBe("false");
     expect(parsed.EXTERNAL_API_MAX_TOKENS_PER_USER).toBe("5");
@@ -99,12 +103,20 @@ describe("validateEnv", () => {
     vi.stubEnv("CUSTOM_BASE_URL", "http://custom:9000");
     vi.stubEnv("CUSTOM_API_KEY", "custom-key");
     vi.stubEnv("CUSTOM_MODEL", "custom-model");
+    vi.stubEnv("OPENCODE_BASE_URL", "http://opencode:4096");
+    vi.stubEnv("OPENCODE_USERNAME", "oc");
+    vi.stubEnv("OPENCODE_PASSWORD", "pw");
+    vi.stubEnv("OPENCODE_MODEL", "opencode/gpt-5");
     const parsed = validateEnv();
     expect(parsed.OPENAI_API_KEY).toBe("sk-test");
     expect(parsed.ANTHROPIC_API_KEY).toBe("ant-test");
     expect(parsed.CUSTOM_BASE_URL).toBe("http://custom:9000");
     expect(parsed.CUSTOM_API_KEY).toBe("custom-key");
     expect(parsed.CUSTOM_MODEL).toBe("custom-model");
+    expect(parsed.OPENCODE_BASE_URL).toBe("http://opencode:4096");
+    expect(parsed.OPENCODE_USERNAME).toBe("oc");
+    expect(parsed.OPENCODE_PASSWORD).toBe("pw");
+    expect(parsed.OPENCODE_MODEL).toBe("opencode/gpt-5");
   });
 
   it("parses vector db settings when provided", () => {

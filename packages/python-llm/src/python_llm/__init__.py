@@ -3,6 +3,7 @@ from .base import BaseLLMProvider, ChatMessage, GenerateRequest, GenerateRespons
 from .custom import CustomProvider
 from .factory import LLMProviderFactory
 from .ollama import OllamaProvider
+from .opencode import OpenCodeProvider
 from .openai import OpenAIProvider
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "OllamaProvider",
     "AnthropicProvider",
     "CustomProvider",
+    "OpenCodeProvider",
 ]

@@ -207,7 +207,7 @@ configure_connector() {
 configure_llm() {
   echo ""
   echo -e "${CYAN}=== LLM Provider Configuration ===${NC}"
-  select_option LLM_PROVIDER "LLM provider" custom ollama openai anthropic
+  select_option LLM_PROVIDER "LLM provider" custom ollama openai anthropic opencode
 
   case "${VARS[LLM_PROVIDER]}" in
     custom)
@@ -226,6 +226,12 @@ configure_llm() {
     anthropic)
       prompt_secret "ANTHROPIC_API_KEY" "Anthropic API key"
       prompt "ANTHROPIC_MODEL" "Anthropic model"
+      ;;
+    opencode)
+      prompt_url "OPENCODE_BASE_URL" "OpenCode base URL"
+      prompt "OPENCODE_USERNAME" "OpenCode username"
+      prompt_secret "OPENCODE_PASSWORD" "OpenCode password (optional)"
+      prompt "OPENCODE_MODEL" "OpenCode model (provider/model, optional)"
       ;;
   esac
 }
@@ -380,6 +386,15 @@ EOF
       cat >> "$ENV_FILE" <<EOF
 ANTHROPIC_API_KEY=${VARS[ANTHROPIC_API_KEY]}
 ANTHROPIC_MODEL=${VARS[ANTHROPIC_MODEL]}
+
+EOF
+      ;;
+    opencode)
+      cat >> "$ENV_FILE" <<EOF
+OPENCODE_BASE_URL=${VARS[OPENCODE_BASE_URL]}
+OPENCODE_USERNAME=${VARS[OPENCODE_USERNAME]}
+OPENCODE_PASSWORD=${VARS[OPENCODE_PASSWORD]}
+OPENCODE_MODEL=${VARS[OPENCODE_MODEL]}
 
 EOF
       ;;

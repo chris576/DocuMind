@@ -8,6 +8,7 @@ from python_llm.anthropic import AnthropicProvider
 from python_llm.base import ChatMessage, GenerateRequest
 from python_llm.custom import CustomProvider
 from python_llm.ollama import OllamaProvider
+from python_llm.opencode import OpenCodeProvider
 from python_llm.openai import OpenAIProvider
 
 
@@ -315,3 +316,78 @@ async def test_custom_generate_stream(mock_openai_cls):
         chunk async for chunk in provider.generate_stream(GenerateRequest(question="Q"))
     ]
     assert collected == ["C1", "C2"]
+
+
+def _opencode_response(payload):
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json.return_value = payload
+    return resp
+
+
+def _opencode_client(session_id="sess-1", parts=None):
+    client = MagicMock()
+    parts = parts if parts is not None else [{"type": "text", "text": "OpenCode A"}]
+    client.post = AsyncMock(
+        side_effect=[
+            _opencode_response({"id": session_id}),
+            _opencode_response({"parts": parts}),
+        ]
+    )
+    return client
+
+
+@pytest.mark.anyio
+async def test_opencode_generate():
+    client = _opencode_client()
+    provider = OpenCodeProvider({})
+    provider._client = client
+
+    result = await provider.generate(GenerateRequest(question="Q"))
+    assert result.answer == "OpenCode A"
+    assert result.provider == "opencode"
+    assert result.model == ""
+
+
+@pytest.mark.anyio
+async def test_opencode_generate_stream_single_chunk():
+    client = _opencode_client()
+    provider = OpenCodeProvider({})
+    provider._client = client
+
+    collected = [
+        chunk async for chunk in provider.generate_stream(GenerateRequest(question="Q"))
+    ]
+    assert collected == ["OpenCode A"]
+
+
+@pytest.mark.anyio
+async def test_opencode_chat():
+    client = _opencode_client(parts=[{"type": "text", "text": "chat reply"}])
+    provider = OpenCodeProvider({})
+    provider._client = client
+
+    reply = await provider.chat([ChatMessage(role="user", content="hi")])
+    assert reply == "chat reply"
+
+
+def test_opencode_model_body():
+    assert OpenCodeProvider({})._model_body() == {}
+    assert OpenCodeProvider(
+        {"opencode_model": "anthropic/claude-3-5-sonnet"}
+    )._model_body() == {
+        "model": {"providerID": "anthropic", "modelID": "claude-3-5-sonnet"}
+    }
+
+
+def test_opencode_extract_text():
+    payload = {
+        "parts": [
+            {"type": "text", "text": "first"},
+            {"type": "text", "text": None},
+            {"type": "tool", "text": "ignored"},
+            {"type": "text", "text": "second"},
+        ]
+    }
+    assert OpenCodeProvider._extract_text(payload) == "first\nsecond"
+    assert OpenCodeProvider._extract_text({"parts": []}) == ""

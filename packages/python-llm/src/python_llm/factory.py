@@ -2,6 +2,7 @@ from .anthropic import AnthropicProvider
 from .base import BaseLLMProvider
 from .custom import CustomProvider
 from .ollama import OllamaProvider
+from .opencode import OpenCodeProvider
 from .openai import OpenAIProvider
 
 
@@ -13,6 +14,7 @@ class LLMProviderFactory:
             "ollama": OllamaProvider,
             "anthropic": AnthropicProvider,
             "custom": CustomProvider,
+            "opencode": OpenCodeProvider,
         }
 
         provider_class = providers.get(provider_type.lower())

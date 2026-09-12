@@ -19,7 +19,7 @@ export const connectorSchema = z.object({
 });
 
 export const llmConfigSchema = z.object({
-  provider: z.enum(['openai', 'ollama', 'anthropic', 'custom']).default('ollama'),
+  provider: z.enum(['openai', 'ollama', 'anthropic', 'custom', 'opencode']).default('ollama'),
   model: z.string().default('llama3.2'),
   baseUrl: z.string().optional(),
   apiKeyEnv: z.string().optional(),
@@ -27,6 +27,10 @@ export const llmConfigSchema = z.object({
   customBaseUrl: z.string().optional(),
   customApiKeyEnv: z.string().optional(),
   customModel: z.string().optional(),
+  opencodeBaseUrl: z.string().optional(),
+  opencodeUsername: z.string().optional(),
+  opencodePasswordEnv: z.string().optional(),
+  opencodeModel: z.string().optional(),
 });
 
 export const vectorDbConfigSchema = z.object({

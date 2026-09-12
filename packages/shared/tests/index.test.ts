@@ -25,18 +25,20 @@ import type {
 } from "../src/index";
 
 describe("shared enums", () => {
-  it("LLMProviderType maps all five providers", () => {
+  it("LLMProviderType maps all six providers", () => {
     expect(shared.LLMProviderType.OPENAI).toBe("openai");
     expect(shared.LLMProviderType.OLLAMA).toBe("ollama");
     expect(shared.LLMProviderType.AZURE).toBe("azure");
     expect(shared.LLMProviderType.CUSTOM).toBe("custom");
     expect(shared.LLMProviderType.ANTHROPIC).toBe("anthropic");
+    expect(shared.LLMProviderType.OPENCODE).toBe("opencode");
     expect(Object.values(shared.LLMProviderType).sort()).toEqual([
       "anthropic",
       "azure",
       "custom",
       "ollama",
       "openai",
+      "opencode",
     ]);
   });
 

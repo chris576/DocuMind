@@ -10,6 +10,7 @@ class LLMProviderType(str, Enum):
     OLLAMA = "ollama"
     ANTHROPIC = "anthropic"
     CUSTOM = "custom"
+    OPENCODE = "opencode"
 
 
 class ChatInitRequest(BaseModel):

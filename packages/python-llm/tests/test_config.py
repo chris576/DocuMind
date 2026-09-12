@@ -13,6 +13,10 @@ def test_llm_config_to_provider_config():
         custom_base_url="http://custom:8000",
         custom_api_key="cust-key",
         custom_model="mymodel",
+        opencode_base_url="http://opencode:4096",
+        opencode_username="oc",
+        opencode_password="pw",
+        opencode_model="opencode/gpt-5",
     )
     assert cfg.to_provider_config() == {
         "model": "gpt-4",
@@ -22,6 +26,10 @@ def test_llm_config_to_provider_config():
         "custom_base_url": "http://custom:8000",
         "custom_api_key": "cust-key",
         "custom_model": "mymodel",
+        "opencode_base_url": "http://opencode:4096",
+        "opencode_username": "oc",
+        "opencode_password": "pw",
+        "opencode_model": "opencode/gpt-5",
     }
 
 
@@ -35,6 +43,10 @@ def test_load_llm_config_defaults(monkeypatch):
         "CUSTOM_BASE_URL",
         "CUSTOM_API_KEY",
         "CUSTOM_MODEL",
+        "OPENCODE_BASE_URL",
+        "OPENCODE_USERNAME",
+        "OPENCODE_PASSWORD",
+        "OPENCODE_MODEL",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -43,6 +55,10 @@ def test_load_llm_config_defaults(monkeypatch):
     assert cfg.model == "llama3.2"
     assert cfg.base_url == "http://localhost:11434"
     assert cfg.api_key is None
+    assert cfg.opencode_base_url == "http://127.0.0.1:4096"
+    assert cfg.opencode_username == "opencode"
+    assert cfg.opencode_password is None
+    assert cfg.opencode_model is None
 
 
 def test_load_llm_config_from_env(monkeypatch):
@@ -54,3 +70,18 @@ def test_load_llm_config_from_env(monkeypatch):
     assert cfg.provider == "openai"
     assert cfg.model == "gpt-4"
     assert cfg.api_key == "sk-123"
+
+
+def test_load_llm_config_opencode_from_env(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "opencode")
+    monkeypatch.setenv("OPENCODE_BASE_URL", "http://host:1234")
+    monkeypatch.setenv("OPENCODE_USERNAME", "user")
+    monkeypatch.setenv("OPENCODE_PASSWORD", "secret")
+    monkeypatch.setenv("OPENCODE_MODEL", "opencode/gpt-5")
+
+    cfg = load_llm_config()
+    assert cfg.provider == "opencode"
+    assert cfg.opencode_base_url == "http://host:1234"
+    assert cfg.opencode_username == "user"
+    assert cfg.opencode_password == "secret"
+    assert cfg.opencode_model == "opencode/gpt-5"

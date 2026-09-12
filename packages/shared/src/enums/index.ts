@@ -4,6 +4,7 @@ export enum LLMProviderType {
   AZURE = 'azure',
   CUSTOM = 'custom',
   ANTHROPIC = 'anthropic',
+  OPENCODE = 'opencode',
 }
 
 export enum VectorDBType {

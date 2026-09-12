@@ -15,12 +15,14 @@ describe("AppConfigService", () => {
   const originalPaperlessUrl = process.env.PAPERLESS_API_URL;
   const originalPaperlessToken = process.env.PAPERLESS_API_TOKEN;
   const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalOpencodePassword = process.env.OPENCODE_PASSWORD;
 
   beforeEach(() => {
     process.env.CONFIG_FILE = tempConfigFile();
     process.env.PAPERLESS_API_URL = "http://paperless:8000";
     process.env.PAPERLESS_API_TOKEN = "secret-token";
     process.env.OPENAI_API_KEY = "openai-key";
+    process.env.OPENCODE_PASSWORD = "oc-pw";
   });
 
   afterEach(() => {
@@ -28,6 +30,7 @@ describe("AppConfigService", () => {
     restore(process.env, "PAPERLESS_API_URL", originalPaperlessUrl);
     restore(process.env, "PAPERLESS_API_TOKEN", originalPaperlessToken);
     restore(process.env, "OPENAI_API_KEY", originalOpenAiKey);
+    restore(process.env, "OPENCODE_PASSWORD", originalOpencodePassword);
   });
 
   it("returns defaults when no file exists", () => {
@@ -58,6 +61,27 @@ describe("AppConfigService", () => {
       provider: "openai",
       model: "gpt-4",
       api_key: "openai-key",
+    });
+  });
+
+  it("resolves the llm slice for opencode", () => {
+    const service = new AppConfigService();
+    service.saveConfig({
+      llm: {
+        provider: "opencode",
+        opencodeBaseUrl: "http://opencode:4096",
+        opencodeUsername: "oc",
+        opencodePasswordEnv: "OPENCODE_PASSWORD",
+        opencodeModel: "opencode/gpt-5",
+      },
+    });
+    const slice = service.getSlice("llm");
+    expect(slice).toMatchObject({
+      provider: "opencode",
+      opencode_base_url: "http://opencode:4096",
+      opencode_username: "oc",
+      opencode_password: "oc-pw",
+      opencode_model: "opencode/gpt-5",
     });
   });
 

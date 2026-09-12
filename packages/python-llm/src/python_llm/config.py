@@ -18,15 +18,20 @@ class LLMConfig:
     custom_base_url: str | None = None
     custom_api_key: str | None = None
     custom_model: str | None = None
+    opencode_base_url: str | None = None
+    opencode_username: str | None = None
+    opencode_password: str | None = None
+    opencode_model: str | None = None
 
     def to_provider_config(self) -> Dict[str, Any]:
         """Build the dict expected by LLMProviderFactory.create().
 
         Only provider-specific keys are passed (``openai_api_key``,
-        ``anthropic_api_key``, ``ollama_base_url``, ``custom_*``). The
-        providers fall back to these keys after the generic ``api_key``/
-        ``base_url`` lookups, so not setting the generic keys keeps the
-        providers from accidentally picking up another provider's key.
+        ``anthropic_api_key``, ``ollama_base_url``, ``custom_*``,
+        ``opencode_*``). The providers fall back to these keys after the
+        generic ``api_key``/``base_url`` lookups, so not setting the generic
+        keys keeps the providers from accidentally picking up another
+        provider's key.
         """
         return {
             "model": self.model,
@@ -36,6 +41,10 @@ class LLMConfig:
             "custom_base_url": self.custom_base_url,
             "custom_api_key": self.custom_api_key,
             "custom_model": self.custom_model,
+            "opencode_base_url": self.opencode_base_url,
+            "opencode_username": self.opencode_username,
+            "opencode_password": self.opencode_password,
+            "opencode_model": self.opencode_model,
         }
 
 
@@ -50,4 +59,8 @@ def load_llm_config() -> LLMConfig:
         custom_base_url=os.getenv("CUSTOM_BASE_URL"),
         custom_api_key=os.getenv("CUSTOM_API_KEY"),
         custom_model=os.getenv("CUSTOM_MODEL"),
+        opencode_base_url=os.getenv("OPENCODE_BASE_URL", "http://127.0.0.1:4096"),
+        opencode_username=os.getenv("OPENCODE_USERNAME", "opencode"),
+        opencode_password=os.getenv("OPENCODE_PASSWORD"),
+        opencode_model=os.getenv("OPENCODE_MODEL"),
     )

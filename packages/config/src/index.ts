@@ -24,6 +24,10 @@ const envSchema = z.object({
   CUSTOM_BASE_URL: z.string().optional(),
   CUSTOM_API_KEY: z.string().optional(),
   CUSTOM_MODEL: z.string().optional(),
+  OPENCODE_BASE_URL: z.string().default('http://127.0.0.1:4096'),
+  OPENCODE_USERNAME: z.string().default('opencode'),
+  OPENCODE_PASSWORD: z.string().optional(),
+  OPENCODE_MODEL: z.string().optional(),
   
   // Vector DB
   VECTOR_DB_TYPE: z.enum(['chroma', 'qdrant', 'pgvector']).default('chroma'),
