@@ -1,7 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Optional } from '@nestjs/common';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import { PipelineRegistry } from './pipeline-registry';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
@@ -20,11 +19,7 @@ export class RestartService {
   private readonly containerMap: Record<string, string>;
   private readonly runCommand: RunCommand;
 
-  constructor(
-    registry: PipelineRegistry,
-    @Optional() runCommand?: RunCommand,
-  ) {
-    void registry;
+  constructor(@Optional() runCommand?: RunCommand) {
     this.containerMap = this.parseMap(process.env.PIPELINE_CONTAINER_MAP);
     this.runCommand = runCommand ?? defaultRunCommand;
   }

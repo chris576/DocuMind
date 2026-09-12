@@ -49,7 +49,7 @@ class IngestionCoordinator:
                     total_new += int(result.get("new_documents", 0))
                     total_documents += int(result.get("total_documents", 0))
                 except Exception as e:  # noqa: BLE001 — best-effort per target
-                    logger.error(f"Ingestion target '{target.id}' failed: {e}")
+                    logger.exception(f"Ingestion target '{target.id}' failed")
                     errors.append(
                         {
                             "target": target.id,

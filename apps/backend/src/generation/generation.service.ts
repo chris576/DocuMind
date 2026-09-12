@@ -1,7 +1,7 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { Readable } from 'stream';
+import { Readable } from 'node:stream';
 import type {
   AskRequestDto,
   AskResponseDto,
@@ -15,9 +15,11 @@ import {
 
 @Injectable()
 export class GenerationService {
+  private readonly logger = new Logger(GenerationService.name);
+
   constructor(
-    private httpService: HttpService,
-    private registry: PipelineRegistry,
+    private readonly httpService: HttpService,
+    private readonly registry: PipelineRegistry,
   ) {}
 
   private resolve(namespace?: string): ResolvedPipeline {
@@ -54,7 +56,13 @@ export class GenerationService {
         provider: data.provider,
       };
     } catch (error) {
-      throw new HttpException('Generation failed', HttpStatus.BAD_GATEWAY);
+      this.logger.error(
+        `Generation failed: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new HttpException('Generation failed', HttpStatus.BAD_GATEWAY, {
+        cause: error,
+      });
     }
   }
 
@@ -74,7 +82,15 @@ export class GenerationService {
       );
       return response.data as Readable;
     } catch (error) {
-      throw new HttpException('Generation stream failed', HttpStatus.BAD_GATEWAY);
+      this.logger.error(
+        `Generation stream failed: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new HttpException(
+        'Generation stream failed',
+        HttpStatus.BAD_GATEWAY,
+        { cause: error },
+      );
     }
   }
 
@@ -86,9 +102,14 @@ export class GenerationService {
       );
       return response.data;
     } catch (error) {
+      this.logger.error(
+        `Generation status unavailable: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       throw new HttpException(
         'Generation status unavailable',
         HttpStatus.BAD_GATEWAY,
+        { cause: error },
       );
     }
   }
@@ -105,9 +126,14 @@ export class GenerationService {
       );
       return response.data;
     } catch (error) {
+      this.logger.error(
+        `Chat initialization failed: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       throw new HttpException(
         'Chat initialization failed',
         HttpStatus.BAD_GATEWAY,
+        { cause: error },
       );
     }
   }
@@ -123,7 +149,13 @@ export class GenerationService {
       );
       return response.data;
     } catch (error) {
-      throw new HttpException('Chat message failed', HttpStatus.BAD_GATEWAY);
+      this.logger.error(
+        `Chat message failed: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new HttpException('Chat message failed', HttpStatus.BAD_GATEWAY, {
+        cause: error,
+      });
     }
   }
 
@@ -139,7 +171,13 @@ export class GenerationService {
       );
       return response.data as Readable;
     } catch (error) {
-      throw new HttpException('Chat stream failed', HttpStatus.BAD_GATEWAY);
+      this.logger.error(
+        `Chat stream failed: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new HttpException('Chat stream failed', HttpStatus.BAD_GATEWAY, {
+        cause: error,
+      });
     }
   }
 }

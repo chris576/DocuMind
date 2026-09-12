@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from .ingestion_service import IngestionService
+from .ingestion_service import IngestionService, VectorDBInitializationError
 
 logger = logging.getLogger("ingestion.tasks")
 
@@ -20,7 +20,7 @@ class IngestionTask:
             if not self.service.is_initialized:
                 self.service.status.message = "Initializing vector database"
                 if not self.service.initialize():
-                    raise Exception("Failed to initialize vector database")
+                    raise VectorDBInitializationError("Failed to initialize vector database")
 
             if force_update:
                 self.service.status.message = "Full refresh"
@@ -64,5 +64,5 @@ class IngestionTask:
             self.service.status.running = False
             self.service.status.message = f"Error: {str(e)}"
             self.running = False
-            logger.error(f"Ingestion error: {str(e)}")
+            logger.exception("Ingestion error")
             raise

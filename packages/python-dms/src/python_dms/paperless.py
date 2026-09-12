@@ -8,6 +8,10 @@ from .base import DocumentProvider, DocumentSummary, SourceDocument
 
 logger = logging.getLogger("python_dms.paperless")
 
+
+class PaperlessAPIError(Exception):
+    """Raised when the Paperless-ngx API returns an unexpected response."""
+
 API_VERSION = 10
 
 # Document fields requested from the list endpoint. Restricting the response via
@@ -63,7 +67,7 @@ class PaperlessDocumentProvider(DocumentProvider):
         """Perform a GET request and return the parsed JSON body."""
         response = requests.get(url, headers=self._headers(), params=params, timeout=30)
         if response.status_code != 200:
-            raise Exception(f"API error: {response.status_code}")
+            raise PaperlessAPIError(f"API error: {response.status_code}")
         return response.json()
 
     def _fetch_all(self, url: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -128,7 +132,7 @@ class PaperlessDocumentProvider(DocumentProvider):
 
             return True, f"Latest document: {results[0].get('id')}"
         except Exception as e:
-            logger.error(f"Error checking for updates: {str(e)}")
+            logger.exception("Error checking for updates")
             return False, f"Error: {str(e)}"
 
     def fetch_documents(self) -> List[SourceDocument]:

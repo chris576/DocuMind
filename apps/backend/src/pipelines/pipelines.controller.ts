@@ -7,9 +7,9 @@ import { RestartService } from './restart.service';
 @Controller('pipelines')
 export class PipelinesController {
   constructor(
-    private registry: PipelineRegistry,
-    private httpService: HttpService,
-    private restartService: RestartService,
+    private readonly registry: PipelineRegistry,
+    private readonly httpService: HttpService,
+    private readonly restartService: RestartService,
   ) {}
 
   @Get()

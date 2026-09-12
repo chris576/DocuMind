@@ -6,7 +6,7 @@ import type { IngestionRunDto } from '@documind/shared';
 @ApiTags('Ingestion')
 @Controller('ingestion')
 export class IngestionController {
-  constructor(private ingestionService: IngestionService) {}
+  constructor(private readonly ingestionService: IngestionService) {}
 
   @Post('run')
   @ApiOperation({ summary: 'Start document indexing (background, returns job)' })

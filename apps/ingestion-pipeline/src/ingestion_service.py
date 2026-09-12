@@ -15,6 +15,14 @@ from .models import IngestionStatus
 logger = logging.getLogger("ingestion.service")
 
 
+class IngestionServiceError(Exception):
+    """Base error for ingestion service failures."""
+
+
+class VectorDBInitializationError(IngestionServiceError):
+    """Raised when the vector database cannot be initialized."""
+
+
 class IngestionService:
     """Orchestrates document ingestion into the vector database.
 
@@ -39,12 +47,12 @@ class IngestionService:
         """Initialize the vector database via the write-only command bus."""
         try:
             if not self.vector_db.execute(InitializeCommand()):
-                raise Exception("Failed to initialize vector database")
+                raise VectorDBInitializationError("Failed to initialize vector database")
 
             self.is_initialized = True
             return True
-        except Exception as e:
-            logger.error(f"Error initializing ingestion service: {str(e)}")
+        except Exception:
+            logger.exception("Error initializing ingestion service")
             self.is_initialized = False
             return False
 
@@ -74,8 +82,8 @@ class IngestionService:
 
             logger.info(f"Found {len(new_docs)} new documents to index")
             return new_docs
-        except Exception as e:
-            logger.error(f"Error checking for new documents: {str(e)}")
+        except Exception:
+            logger.exception("Error checking for new documents")
             return []
 
     def load_documents(self, force_refresh: bool = False, check_new: bool = False) -> List[SourceDocument]:
@@ -97,9 +105,8 @@ class IngestionService:
         return self.documents
 
     def add_documents_to_vector_db(self, documents: List[SourceDocument]) -> None:
-        if not self.is_initialized:
-            if not self.initialize():
-                raise Exception("Failed to initialize ingestion service")
+        if not self.is_initialized and not self.initialize():
+            raise VectorDBInitializationError("Failed to initialize ingestion service")
 
         vector_documents = [
             VectorDBDocument(

@@ -15,6 +15,14 @@ from .models import SearchEngineStatus, SearchRequest, SearchResult
 logger = logging.getLogger("retrieval")
 
 
+class VectorDBNotInitializedError(Exception):
+    """Raised when the vector database has not been initialized."""
+
+
+class RerankerNotInitializedError(Exception):
+    """Raised when the reranker has not been initialized."""
+
+
 class SearchEngine:
     def __init__(self, config: dict):
         self.vector_db_type = config.get("vector_db_type", "chroma")
@@ -69,8 +77,8 @@ class SearchEngine:
             self.status.initialized = True
             self.status.last_updated = datetime.now().isoformat()
             return True
-        except Exception as e:
-            logger.error(f"Error initializing search engine: {str(e)}")
+        except Exception:
+            logger.exception("Error initializing search engine")
             self.is_initialized = False
             self.status.initialized = False
             return False
@@ -93,8 +101,8 @@ class SearchEngine:
             self.status.chroma_ready = ready
             self.status.documents_count = total
             return True
-        except Exception as e:
-            logger.error(f"Error setting up vector database: {str(e)}")
+        except Exception:
+            logger.exception("Error setting up vector database")
             self.status.chroma_ready = False
             return False
 
@@ -141,10 +149,40 @@ class SearchEngine:
                 merged.append(doc)
         return merged
 
+    def _apply_filters(
+        self, results: List[dict], request: SearchRequest
+    ) -> List[dict]:
+        """Apply date/correspondent filters to raw search results."""
+        if not (request.from_date or request.to_date or request.correspondent):
+            return results
+
+        filtered: List[dict] = []
+        for result in results:
+            include = True
+
+            if request.from_date and result.get("date"):
+                if result["date"].split("T")[0] < request.from_date:
+                    include = False
+
+            if request.to_date and result.get("date"):
+                if result["date"].split("T")[0] > request.to_date:
+                    include = False
+
+            if request.correspondent and result.get("correspondent"):
+                if (
+                    request.correspondent.lower()
+                    not in result["correspondent"].lower()
+                ):
+                    include = False
+
+            if include:
+                filtered.append(result)
+        return filtered
+
     def semantic_search(self, query: str, top_k: int | None = None) -> List[dict]:
         """Semantic-only search across all collections via the CQRS read bus."""
         if not self.vector_db and not self.readers:
-            raise Exception("Vector database not initialized")
+            raise VectorDBNotInitializedError("Vector database not initialized")
 
         top_k = top_k or self.max_results
         merged: List[dict] = []
@@ -159,7 +197,7 @@ class SearchEngine:
     def hybrid_search(self, query: str, top_k: int | None = None) -> List[dict]:
         """Hybrid search across all collections (CQRS read bus)."""
         if not self.vector_db and not self.readers:
-            raise Exception("Vector database not initialized")
+            raise VectorDBNotInitializedError("Vector database not initialized")
         return self._collect_results(query, top_k)
 
     def rerank_results(self, query: str, results: List[dict], top_k: int | None = None) -> List[dict]:
@@ -170,11 +208,11 @@ class SearchEngine:
 
         try:
             if self.reranker is None:
-                raise Exception("Reranker not initialized")
+                raise RerankerNotInitializedError("Reranker not initialized")
             reranked = self.reranker.rerank(query, results, top_k)
             return list(reranked) if reranked else []
-        except Exception as e:
-            logger.error(f"Error reranking: {str(e)}")
+        except Exception:
+            logger.exception("Error reranking")
             for r in results:
                 r["cross_score"] = 0.5
             return results[:top_k]
@@ -206,37 +244,18 @@ class SearchEngine:
                 snippet = content[:max_len] + "..."
 
             return snippet.strip()
-        except Exception as e:
-            logger.error(f"Error creating snippet: {str(e)}")
+        except Exception:
+            logger.exception("Error creating snippet")
             return content[:max_len] + "..." if content else ""
 
     def search(self, request: SearchRequest) -> List[SearchResult]:
-        if not self.is_initialized:
-            self.initialize()
+        if not self.is_initialized and not self.initialize():
+            raise VectorDBNotInitializedError("Vector database not initialized")
 
-        results = self._collect_results(request.query, request.max_results, request.collections)
-
-        if request.from_date or request.to_date or request.correspondent:
-            filtered = []
-            for result in results:
-                include = True
-
-                if request.from_date and result.get("date"):
-                    if result["date"].split("T")[0] < request.from_date:
-                        include = False
-
-                if request.to_date and result.get("date"):
-                    if result["date"].split("T")[0] > request.to_date:
-                        include = False
-
-                if request.correspondent and result.get("correspondent"):
-                    if request.correspondent.lower() not in result["correspondent"].lower():
-                        include = False
-
-                if include:
-                    filtered.append(result)
-            results = filtered
-
+        results = self._collect_results(
+            request.query, request.max_results, request.collections
+        )
+        results = self._apply_filters(results, request)
         reranked = self.rerank_results(request.query, results, request.max_results)
 
         formatted = []

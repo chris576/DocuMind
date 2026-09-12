@@ -95,6 +95,10 @@ export class AppConfigService {
       custom_base_url: c.llm.customBaseUrl,
       custom_api_key: this.resolveEnv(c.llm.customApiKeyEnv),
       custom_model: c.llm.customModel,
+      opencode_base_url: c.llm.opencodeBaseUrl,
+      opencode_username: c.llm.opencodeUsername,
+      opencode_password: this.resolveEnv(c.llm.opencodePasswordEnv),
+      opencode_model: c.llm.opencodeModel,
     };
   }
 

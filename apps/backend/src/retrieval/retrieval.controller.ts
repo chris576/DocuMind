@@ -6,7 +6,7 @@ import type { SearchRequestDto } from '@documind/shared';
 @ApiTags('Retrieval')
 @Controller('retrieval')
 export class RetrievalController {
-  constructor(private retrievalService: RetrievalService) {}
+  constructor(private readonly retrievalService: RetrievalService) {}
 
   @Post('search')
   @ApiOperation({ summary: 'Search documents' })

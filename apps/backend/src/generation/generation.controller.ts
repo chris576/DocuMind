@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { Readable } from 'stream';
+import { Readable } from 'node:stream';
 import { GenerationService } from './generation.service';
 import type {
   AskRequestDto,
@@ -12,7 +12,7 @@ import type {
 @ApiTags('Generation')
 @Controller('generation')
 export class GenerationController {
-  constructor(private generationService: GenerationService) {}
+  constructor(private readonly generationService: GenerationService) {}
 
   @Post('ask')
   @ApiOperation({ summary: 'Ask a question about documents' })

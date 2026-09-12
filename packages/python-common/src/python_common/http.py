@@ -30,6 +30,6 @@ async def post_json(
             if not isinstance(data, dict):
                 return None
             return cast(Dict[str, Any], data)
-    except Exception as e:
-        logger.error(f"HTTP POST to {url} failed: {str(e)}")
+    except Exception:
+        logger.exception(f"HTTP POST to {url} failed")
         return None

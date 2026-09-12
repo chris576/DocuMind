@@ -186,8 +186,10 @@ function invokedDirectly(): boolean {
 }
 
 if (invokedDirectly()) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error('documind-mcp-server failed:', error);
     process.exit(1);
-  });
+  }
 }

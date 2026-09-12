@@ -1,6 +1,5 @@
 import { HttpException, HttpStatus } from "@nestjs/common";
 import { afterEach, describe, expect, it } from "vitest";
-import { PipelineRegistry } from "./pipeline-registry";
 import { RestartService } from "./restart.service";
 
 type RunCommand = (command: string, args: string[]) => Promise<unknown>;
@@ -14,7 +13,7 @@ function makeService(
   } else {
     process.env.PIPELINE_CONTAINER_MAP = map;
   }
-  return new RestartService(new PipelineRegistry(), runCommand);
+  return new RestartService(runCommand);
 }
 
 describe("RestartService", () => {

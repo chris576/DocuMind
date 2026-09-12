@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import type { SearchRequestDto, SearchResult } from '@documind/shared';
@@ -9,9 +9,11 @@ import {
 
 @Injectable()
 export class RetrievalService {
+  private readonly logger = new Logger(RetrievalService.name);
+
   constructor(
-    private httpService: HttpService,
-    private registry: PipelineRegistry,
+    private readonly httpService: HttpService,
+    private readonly registry: PipelineRegistry,
   ) {}
 
   private resolve(namespace?: string): ResolvedPipeline {
@@ -43,7 +45,13 @@ export class RetrievalService {
       );
       return this.mapResults(response.data);
     } catch (error) {
-      throw new HttpException('Search failed', HttpStatus.BAD_GATEWAY);
+      this.logger.error(
+        `Search failed: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new HttpException('Search failed', HttpStatus.BAD_GATEWAY, {
+        cause: error,
+      });
     }
   }
 
@@ -67,9 +75,14 @@ export class RetrievalService {
       );
       return response.data;
     } catch (error) {
+      this.logger.error(
+        `Context retrieval failed: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       throw new HttpException(
         'Context retrieval failed',
         HttpStatus.BAD_GATEWAY,
+        { cause: error },
       );
     }
   }
@@ -82,9 +95,14 @@ export class RetrievalService {
       );
       return response.data;
     } catch (error) {
+      this.logger.error(
+        `Retrieval status unavailable: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       throw new HttpException(
         'Retrieval status unavailable',
         HttpStatus.BAD_GATEWAY,
+        { cause: error },
       );
     }
   }

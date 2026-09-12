@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import type { IngestionRunDto } from '@documind/shared';
@@ -10,10 +10,12 @@ import { IngestionJob, IngestionJobStore } from './job-store';
 
 @Injectable()
 export class IngestionService {
+  private readonly logger = new Logger(IngestionService.name);
+
   constructor(
-    private httpService: HttpService,
-    private registry: PipelineRegistry,
-    private jobStore: IngestionJobStore,
+    private readonly httpService: HttpService,
+    private readonly registry: PipelineRegistry,
+    private readonly jobStore: IngestionJobStore,
   ) {}
 
   private resolve(namespace?: string): ResolvedPipeline {
@@ -45,9 +47,14 @@ export class IngestionService {
       return this.jobStore.get(job.id) ?? job;
     } catch (error) {
       this.jobStore.update(job.id, { status: 'failed' });
+      this.logger.error(
+        `Failed to start ingestion: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       throw new HttpException(
         'Failed to start ingestion',
         HttpStatus.BAD_GATEWAY,
+        { cause: error },
       );
     }
   }
@@ -63,7 +70,13 @@ export class IngestionService {
       );
       return response.data;
     } catch (error) {
-      throw new HttpException('Ingestion failed', HttpStatus.BAD_GATEWAY);
+      this.logger.error(
+        `Ingestion failed: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new HttpException('Ingestion failed', HttpStatus.BAD_GATEWAY, {
+        cause: error,
+      });
     }
   }
 
@@ -75,9 +88,14 @@ export class IngestionService {
       );
       return response.data;
     } catch (error) {
+      this.logger.error(
+        `Ingestion status unavailable: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       throw new HttpException(
         'Ingestion status unavailable',
         HttpStatus.BAD_GATEWAY,
+        { cause: error },
       );
     }
   }
