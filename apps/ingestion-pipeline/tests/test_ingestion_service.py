@@ -106,7 +106,26 @@ def test_add_documents_to_vector_db_initializes_if_needed():
     index_cmd = [c.args[0] for c in bus.execute.call_args_list if isinstance(c.args[0], IndexDocumentsCommand)]
     assert len(index_cmd) == 1
     assert isinstance(index_cmd[0].documents[0], VectorDBDocument)
-    assert index_cmd[0].documents[0].metadata["correspondent"] == "Corr"
+    meta = index_cmd[0].documents[0].metadata
+    assert meta["correspondent"] == "Corr"
+    assert meta["document_type"] == "Type"
+    assert meta["storage_path"] == "Path"
+    assert meta["tags"] == ["tag1"]
+    assert meta["hash"] == "h"
+    assert meta["title"] == "T"
+    assert meta["created"] == "2024-01-01"
+
+
+def test_add_documents_merges_custom_fields_into_metadata():
+    svc, _provider, bus = _service()
+    bus.execute.side_effect = lambda cmd: True if isinstance(cmd, InitializeCommand) else None
+    svc.add_documents_to_vector_db(
+        [_doc("1", metadata={"custom_fields.rechnungsnr": "ABC-123"})]
+    )
+    index_cmd = [c.args[0] for c in bus.execute.call_args_list if isinstance(c.args[0], IndexDocumentsCommand)]
+    meta = index_cmd[0].documents[0].metadata
+    assert meta["custom_fields.rechnungsnr"] == "ABC-123"
+    assert meta["document_type"] == "Type"
 
 
 def test_add_documents_to_vector_db_initialization_fails():

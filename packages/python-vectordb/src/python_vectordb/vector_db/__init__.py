@@ -6,7 +6,6 @@ from .bus import (
     VectorDBCommandBus,
     WriteOnlyError,
 )
-from .chroma import ChromaVectorDB
 from .commands import (
     DeleteCollectionCommand,
     DeleteDocumentsCommand,
@@ -16,8 +15,7 @@ from .commands import (
 from .factory import VectorDBFactory
 from .pgvector import PgVectorVectorDB
 from .ports import VectorDBReader, VectorDBWriter
-from .qdrant import QdrantVectorDB
-from .queries import GetStatusQuery, HybridSearchQuery, SearchQuery
+from .queries import FactsQuery, GetStatusQuery, HybridSearchQuery, SearchQuery
 
 __all__ = [
     "BaseVectorDB",
@@ -37,8 +35,7 @@ __all__ = [
     "SearchQuery",
     "HybridSearchQuery",
     "GetStatusQuery",
-    "ChromaVectorDB",
-    "QdrantVectorDB",
+    "FactsQuery",
     "PgVectorVectorDB",
     "VectorDBFactory",
 ]

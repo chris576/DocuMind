@@ -5,6 +5,7 @@ import pytest
 
 from python_vectordb.vector_db.base import VectorDBDocument
 from python_vectordb.vector_db.pgvector import PgVectorVectorDB
+from python_vectordb.vector_db.queries import FactsQuery
 
 
 def _provider():
@@ -37,13 +38,22 @@ def test_initialize_creates_table(mock_connect):
     conn.commit.assert_called()
     assert cursor.execute.call_count >= 2
     sqls = [str(c.args[0]) for c in cursor.execute.call_args_list]
-    assert any("CREATE TABLE IF NOT EXISTS documents" in s for s in sqls)
+    assert any("CREATE TABLE IF NOT EXISTS document_facts" in s for s in sqls)
     # FTS generated column present in DDL.
-    ddl = next(s for s in sqls if "CREATE TABLE IF NOT EXISTS documents" in s)
+    ddl = next(s for s in sqls if "CREATE TABLE IF NOT EXISTS document_facts" in s)
     assert "tsvector GENERATED ALWAYS AS" in ddl
     assert "to_tsvector('german'" in ddl
-    # GIN index created for full text search.
+    # Fact columns present in DDL.
+    assert "raw_json JSONB" in ddl
+    assert "extracted JSONB" in ddl
+    assert "document_type TEXT" in ddl
+    assert "namespace TEXT" in ddl
+    # GIN indexes for FTS + fact columns.
     assert any("USING GIN (fts)" in s for s in sqls)
+    assert any("USING GIN (raw_json)" in s for s in sqls)
+    assert any("USING GIN (extracted)" in s for s in sqls)
+    assert any("namespace, document_type" in s for s in sqls)
+    assert any("CREATE TABLE IF NOT EXISTS fact_keys" in s for s in sqls)
 
 
 @patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
@@ -83,8 +93,9 @@ def test_add_documents_inserts(mock_connect):
     conn.commit.assert_called()
     cursor.execute.assert_called()
     sql = cursor.execute.call_args.args[0]
-    assert "INSERT INTO documents" in sql
+    assert "INSERT INTO document_facts" in sql
     assert "ON CONFLICT (id) DO UPDATE" in sql
+    assert "raw_json" in sql
 
 
 def test_search_requires_ready():
@@ -114,6 +125,9 @@ def test_search_maps_rows(mock_connect):
     assert results[0].score == 0.9
     assert results[1].score == 0.0
     assert results[1].metadata == {}
+    # Search is scoped to the adapter's namespace.
+    sql = cursor.execute.call_args.args[0]
+    assert "WHERE namespace = %s" in sql
 
 
 def test_delete_collection_requires_conn():
@@ -133,7 +147,7 @@ def test_delete_collection_drops_table(mock_connect):
     adapter.connection = conn
     adapter.delete_collection()
     conn.commit.assert_called()
-    assert "DROP TABLE IF EXISTS documents" in cursor.execute.call_args.args[0]
+    assert "DROP TABLE IF EXISTS document_facts" in cursor.execute.call_args.args[0]
 
 
 def test_delete_documents_requires_ready():
@@ -154,7 +168,7 @@ def test_delete_documents_calls_delete(mock_connect):
     adapter.connection = conn
     adapter.delete_documents(["1", "2"])
     conn.commit.assert_called()
-    assert "DELETE FROM documents" in cursor.execute.call_args.args[0]
+    assert "DELETE FROM document_facts" in cursor.execute.call_args.args[0]
 
 
 @patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
@@ -365,3 +379,74 @@ def test_hybrid_search_uses_configured_fts_language(mock_connect):
     adapter.hybrid_search("q")
     sql = cursor.execute.call_args.args[0]
     assert "plainto_tsquery('english'" in sql
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_initialize_migrates_legacy_table(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchone.return_value = ("documents",)
+    mock_connect.return_value = conn
+
+    adapter = _adapter()
+    assert adapter.initialize() is True
+
+    sqls = [str(c.args[0]) for c in cursor.execute.call_args_list]
+    assert any("SAVEPOINT legacy_migration" in s for s in sqls)
+    assert any("INSERT INTO document_facts" in s and "FROM documents" in s for s in sqls)
+    assert any("DROP TABLE IF EXISTS documents" in s for s in sqls)
+
+
+def test_query_facts_requires_ready():
+    adapter = _adapter()
+    with pytest.raises(Exception, match="not initialized"):
+        adapter.query_facts(FactsQuery())
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_query_facts_returns_items(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchall.return_value = [
+        ("1", "Rechnung", "Rechnung", {"k": "v"}, {"invoice_number": "4711"}),
+    ]
+    mock_connect.return_value = conn
+
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.connection = conn
+
+    result = adapter.query_facts(FactsQuery(document_type="Rechnung", key="invoice_number"))
+    assert result["count"] == 1
+    assert result["items"][0]["extracted"]["invoice_number"] == "4711"
+    sql = cursor.execute.call_args.args[0]
+    assert "document_type = %s" in sql
+    assert "extracted ? %s" in sql
+
+
+@patch("python_vectordb.vector_db.pgvector.psycopg2.connect")
+def test_query_facts_aggregate(mock_connect):
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchone.return_value = (123.45,)
+    mock_connect.return_value = conn
+
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.connection = conn
+
+    result = adapter.query_facts(FactsQuery(key="amount", aggregate="sum"))
+    assert result == {"aggregate": "sum", "key": "amount", "value": 123.45}
+    sql = cursor.execute.call_args.args[0]
+    assert "SUM((extracted->>%s)::numeric)" in sql
+
+
+def test_query_facts_unsupported_aggregate():
+    adapter = _adapter()
+    adapter.ready = True
+    adapter.connection = MagicMock()
+    with pytest.raises(ValueError, match="Unsupported aggregation"):
+        adapter.query_facts(FactsQuery(key="amount", aggregate="median"))

@@ -3,9 +3,7 @@ from typing import Any, Dict, List, Type
 from ..embeddings import EmbeddingProviderFactory
 from .base import BaseVectorDB
 from .bus import VectorDBCommandBus
-from .chroma import ChromaVectorDB
 from .pgvector import PgVectorVectorDB
-from .qdrant import QdrantVectorDB
 
 
 class VectorDBFactory:
@@ -13,21 +11,19 @@ class VectorDBFactory:
 
     The concrete database is selected by the ``type`` config value (set via the
     VECTOR_DB_TYPE environment variable in the container). Supported adapters
-    are registered in ``_REGISTRY``.
+    are registered in ``_REGISTRY``. Only PGVector is supported.
 
     - ``create_writer`` returns a write-only bus (ingestion pipeline).
     - ``create_reader`` returns a read-only bus (retrieval pipeline).
     """
 
     _REGISTRY: Dict[str, Type[BaseVectorDB]] = {
-        "chroma": ChromaVectorDB,
-        "qdrant": QdrantVectorDB,
         "pgvector": PgVectorVectorDB,
     }
 
     @staticmethod
     def _create_adapter(config: Dict[str, Any], embedding_provider=None) -> BaseVectorDB:
-        db_type = config.get("type", "chroma").lower()
+        db_type = config.get("type", "pgvector").lower()
 
         adapter_class = VectorDBFactory._REGISTRY.get(db_type)
         if adapter_class is None:
@@ -56,10 +52,10 @@ class VectorDBFactory:
     def create_writers(
         config: Dict[str, Any], collections: List[str]
     ) -> Dict[str, VectorDBCommandBus]:
-        """Create one write-only bus per collection, sharing a single embedding provider.
+        """Create one write-only bus per namespace, sharing one embedding provider.
 
-        The embedding model is loaded once and reused across all collections,
-        avoiding N× memory/time when one ingestion process serves many sources.
+        The embedding model is loaded once and reused across all namespaces.
+        All adapters target the same underlying ``document_facts`` table.
         """
         embedding_provider = EmbeddingProviderFactory.create(config)
         writers: Dict[str, VectorDBCommandBus] = {}
@@ -85,7 +81,7 @@ class VectorDBFactory:
     def create_readers(
         config: Dict[str, Any], collections: List[str]
     ) -> Dict[str, VectorDBCommandBus]:
-        """Create one read-only bus per collection, sharing a single embedding provider."""
+        """Create one read-only bus per namespace, sharing one embedding provider."""
         embedding_provider = EmbeddingProviderFactory.create(config)
         readers: Dict[str, VectorDBCommandBus] = {}
         for collection in collections:

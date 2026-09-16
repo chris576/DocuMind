@@ -10,8 +10,9 @@ from src.search_engine import SearchEngine
 
 def _engine(**kwargs):
     config = {
-        "vector_db_type": "chroma",
-        "collection_name": "docs",
+        "type": "pgvector",
+        "collection": "docs",
+        "url": "postgresql://u:p@localhost/db",
         "embedding_model": "m",
         "embedding_provider": "st",
     }
@@ -20,9 +21,8 @@ def _engine(**kwargs):
 
 
 def test_vector_db_config_variants():
-    assert _engine(vector_db_type="chroma")._vector_db_config()["type"] == "chroma"
-    assert _engine(vector_db_type="qdrant", qdrant_url="http://q")._vector_db_config()["type"] == "qdrant"
-    assert _engine(vector_db_type="pgvector", pgvector_url="pg://x")._vector_db_config()["type"] == "pgvector"
+    assert _engine()._vector_db_config()["type"] == "pgvector"
+    assert _engine(type="pgvector", url="pg://x")._vector_db_config()["url"] == "pg://x"
 
 
 @patch("src.search_engine.RerankerFactory.create")

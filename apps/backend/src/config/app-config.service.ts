@@ -158,23 +158,16 @@ export class AppConfigService {
       reranker_provider: v.rerankerProvider,
       cross_encoder_model: v.crossEncoderModel,
       similarity_metric: v.similarityMetric,
-      chroma_url: v.chromaUrl ?? process.env.CHROMA_URL,
-      qdrant_url: v.qdrantUrl ?? process.env.QDRANT_URL,
-      qdrant_api_key:
-        this.resolveEnv(v.qdrantApiKeyEnv) ?? process.env.QDRANT_API_KEY,
       pgvector_url: v.pgvectorUrl ?? process.env.PGVECTOR_URL,
       keyword_method: h.keywordMethod,
       keyword_weight: h.keywordWeight,
       semantic_weight: h.semanticWeight,
       fts_language: h.ftsLanguage,
-      keyword_index_file: h.keywordIndexFile,
     };
   }
 
   private redactSecrets(config: DocuMindConfig): DocuMindConfig {
     const clone: DocuMindConfig = JSON.parse(JSON.stringify(config));
-    clone.vectorDb.chromaUrl = this.redactUrl(clone.vectorDb.chromaUrl);
-    clone.vectorDb.qdrantUrl = this.redactUrl(clone.vectorDb.qdrantUrl);
     clone.vectorDb.pgvectorUrl = this.redactUrl(clone.vectorDb.pgvectorUrl);
     for (const connector of clone.connectors) {
       connector.url = this.redactUrl(connector.url);
@@ -191,14 +184,6 @@ export class AppConfigService {
 
     if (obj.vectorDb && typeof obj.vectorDb === 'object') {
       const vectorDb = obj.vectorDb as Record<string, unknown>;
-      vectorDb.chromaUrl = this.restoreUrl(
-        vectorDb.chromaUrl as string | undefined,
-        previous.vectorDb.chromaUrl,
-      );
-      vectorDb.qdrantUrl = this.restoreUrl(
-        vectorDb.qdrantUrl as string | undefined,
-        previous.vectorDb.qdrantUrl,
-      );
       vectorDb.pgvectorUrl = this.restoreUrl(
         vectorDb.pgvectorUrl as string | undefined,
         previous.vectorDb.pgvectorUrl,

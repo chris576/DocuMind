@@ -24,7 +24,7 @@ describe("validateEnv", () => {
     // Vitest setzt NODE_ENV=test; das Schema erlaubt diesen Wert.
     expect(parsed.NODE_ENV).toBe("test");
     expect(parsed.DOCUMENT_PROVIDER).toBe("paperless");
-    expect(parsed.VECTOR_DB_TYPE).toBe("chroma");
+    expect(parsed.VECTOR_DB_TYPE).toBe("pgvector");
     expect(parsed.BACKEND_PORT).toBe("3001");
     expect(parsed.FRONTEND_PORT).toBe("3000");
     expect(parsed.OLLAMA_API_URL).toBe("http://localhost:11434");
@@ -33,7 +33,6 @@ describe("validateEnv", () => {
     expect(parsed.OPENCODE_USERNAME).toBe("opencode");
     expect(parsed.OPENCODE_PASSWORD).toBeUndefined();
     expect(parsed.OPENCODE_MODEL).toBeUndefined();
-    expect(parsed.CHROMA_URL).toBe("http://localhost:8000");
     expect(parsed.EXTERNAL_API_ENABLED).toBe("false");
     expect(parsed.EXTERNAL_API_MAX_TOKENS_PER_USER).toBe("5");
     expect(parsed.EXTERNAL_API_DEFAULT_MONTHLY_LIMIT).toBe("1000");
@@ -121,14 +120,10 @@ describe("validateEnv", () => {
 
   it("parses vector db settings when provided", () => {
     setValid();
-    vi.stubEnv("VECTOR_DB_TYPE", "qdrant");
-    vi.stubEnv("QDRANT_URL", "http://qdrant:6333");
-    vi.stubEnv("QDRANT_API_KEY", "qdrant-key");
+    vi.stubEnv("VECTOR_DB_TYPE", "pgvector");
     vi.stubEnv("PGVECTOR_URL", "postgres://localhost:5432/documind");
     const parsed = validateEnv();
-    expect(parsed.VECTOR_DB_TYPE).toBe("qdrant");
-    expect(parsed.QDRANT_URL).toBe("http://qdrant:6333");
-    expect(parsed.QDRANT_API_KEY).toBe("qdrant-key");
+    expect(parsed.VECTOR_DB_TYPE).toBe("pgvector");
     expect(parsed.PGVECTOR_URL).toBe("postgres://localhost:5432/documind");
   });
 

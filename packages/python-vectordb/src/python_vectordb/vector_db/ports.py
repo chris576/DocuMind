@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:
     from .base import VectorDBDocument, VectorDBSearchResult
+    from .queries import FactsQuery
 
 
 class VectorDBWriter(ABC):
@@ -51,4 +52,9 @@ class VectorDBReader(ABC):
     @abstractmethod
     def get_status(self) -> Dict[str, Any]:
         """Return the current status of the vector database."""
+        pass
+
+    @abstractmethod
+    def query_facts(self, query: FactsQuery) -> Dict[str, Any]:
+        """Query denormalized facts with optional filtering and aggregation."""
         pass

@@ -34,7 +34,7 @@ export const llmConfigSchema = z.object({
 });
 
 export const vectorDbConfigSchema = z.object({
-  type: z.enum(['chroma', 'qdrant', 'pgvector']).default('chroma'),
+  type: z.enum(['pgvector']).default('pgvector'),
   collection: z.string().default('documents'),
   embeddingProvider: z.string().default('sentence_transformer'),
   embeddingModel: z
@@ -45,9 +45,6 @@ export const vectorDbConfigSchema = z.object({
     .string()
     .default('cross-encoder/ms-marco-MiniLM-L-6-v2'),
   similarityMetric: z.string().default('cosine'),
-  chromaUrl: z.string().optional(),
-  qdrantUrl: z.string().optional(),
-  qdrantApiKeyEnv: z.string().optional(),
   pgvectorUrl: z.string().optional(),
 });
 
@@ -56,7 +53,6 @@ export const hybridSearchConfigSchema = z.object({
   keywordWeight: z.number().default(0.3),
   semanticWeight: z.number().default(0.7),
   ftsLanguage: z.string().default('german'),
-  keywordIndexFile: z.string().default('./data/bm25_index.pkl'),
 });
 
 export const retrievalConfigSchema = z.object({

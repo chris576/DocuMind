@@ -7,7 +7,7 @@ from .commands import (
     InitializeCommand,
 )
 from .ports import VectorDBReader, VectorDBWriter
-from .queries import GetStatusQuery, HybridSearchQuery, SearchQuery
+from .queries import FactsQuery, GetStatusQuery, HybridSearchQuery, SearchQuery
 
 
 class ReadOnlyError(RuntimeError):
@@ -76,4 +76,6 @@ class VectorDBCommandBus:
             return self._reader.hybrid_search(query.query, query.top_k)
         if isinstance(query, GetStatusQuery):
             return self._reader.get_status()
+        if isinstance(query, FactsQuery):
+            return self._reader.query_facts(query)
         raise UnknownQueryError(f"Unsupported query: {type(query).__name__}")

@@ -17,7 +17,7 @@ def client(monkeypatch):
     engine.get_status.return_value = {
         "service": "retrieval-pipeline",
         "initialized": True,
-        "vector_db_type": "chroma",
+        "vector_db_type": "pgvector",
         "vector_db_ready": True,
         "chroma_ready": True,
         "bm25_ready": True,

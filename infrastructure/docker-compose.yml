@@ -38,10 +38,7 @@ services:
       - OPENCODE_USERNAME=${OPENCODE_USERNAME:-opencode}
       - OPENCODE_PASSWORD=${OPENCODE_PASSWORD}
       - OPENCODE_MODEL=${OPENCODE_MODEL}
-      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
-      - CHROMA_URL=http://chromadb:8000
-      - QDRANT_URL=http://qdrant:6333
-      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-pgvector}
       - PGVECTOR_URL=postgresql://paperless:paperless@pgvector:5432/paperless_ai
       - INGESTION_PIPELINE_URL=http://ingestion-pipeline:${INGESTION_PORT:-8001}
       - RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:${RETRIEVAL_PORT:-8002}
@@ -51,8 +48,6 @@ services:
       - GATEWAY_API_TOKEN=${GATEWAY_API_TOKEN:-}
     depends_on:
       - postgres
-      - chromadb
-      - qdrant
       - pgvector
     volumes:
       - ./config:/data
@@ -75,15 +70,10 @@ services:
       - DOCUMENT_PROVIDER=${DOCUMENT_PROVIDER:-paperless}
       - DOCUMENT_PROVIDER_URL=${DOCUMENT_PROVIDER_URL:-${PAPERLESS_API_URL}}
       - DOCUMENT_PROVIDER_TOKEN=${DOCUMENT_PROVIDER_TOKEN:-${PAPERLESS_API_TOKEN}}
-      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-pgvector}
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-sentence_transformer}
-      - CHROMA_URL=http://chromadb:8000
-      - QDRANT_URL=http://qdrant:6333
-      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
       - PGVECTOR_URL=postgresql://paperless:paperless@pgvector:5432/paperless_ai
     depends_on:
-      - chromadb
-      - qdrant
       - pgvector
     networks:
       - paperless-network
@@ -99,16 +89,11 @@ services:
       - PYTHONUNBUFFERED=1
       - PORT=${RETRIEVAL_PORT:-8002}
       - GATEWAY_URL=http://backend:3001
-      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-chroma}
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-pgvector}
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-sentence_transformer}
       - RERANKER_PROVIDER=${RERANKER_PROVIDER:-cross_encoder}
-      - CHROMA_URL=http://chromadb:8000
-      - QDRANT_URL=http://qdrant:6333
-      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
       - PGVECTOR_URL=postgresql://paperless:paperless@pgvector:5432/paperless_ai
     depends_on:
-      - chromadb
-      - qdrant
       - pgvector
     networks:
       - paperless-network
@@ -137,6 +122,36 @@ services:
     networks:
       - paperless-network
 
+  # Extraction Pipeline (Python) — asynchrone strukturierte Fakten-Extraktion
+  extraction-pipeline:
+    build:
+      context: ..
+      dockerfile: apps/extraction-pipeline/Dockerfile
+    ports:
+      - "${EXTRACTION_HOST_PORT:-8004}:${EXTRACTION_PORT:-8004}"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=${EXTRACTION_PORT:-8004}
+      - PGVECTOR_URL=postgresql://paperless:paperless@pgvector:5432/paperless_ai
+      - FACT_TABLE=${FACT_TABLE:-document_facts}
+      - EXTRACTION_BATCH_SIZE=${EXTRACTION_BATCH_SIZE:-10}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CUSTOM_BASE_URL=${CUSTOM_BASE_URL}
+      - CUSTOM_API_KEY=${CUSTOM_API_KEY}
+      - CUSTOM_MODEL=${CUSTOM_MODEL}
+      - OPENCODE_BASE_URL=${OPENCODE_BASE_URL:-http://127.0.0.1:4096}
+      - OPENCODE_USERNAME=${OPENCODE_USERNAME:-opencode}
+      - OPENCODE_PASSWORD=${OPENCODE_PASSWORD}
+      - OPENCODE_MODEL=${OPENCODE_MODEL}
+    depends_on:
+      - pgvector
+    networks:
+      - paperless-network
+
   # PostgreSQL
   postgres:
     image: postgres:16-alpine
@@ -148,29 +163,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - paperless-network
-
-  # ChromaDB
-  chromadb:
-    image: chromadb/chroma:latest
-    ports:
-      - "8000:8000"
-    volumes:
-      - chroma_data:/chroma/chroma
-    environment:
-      - IS_PERSISTENT=TRUE
-      - ANONYMIZED_TELEMETRY=FALSE
-    networks:
-      - paperless-network
-
-  # Qdrant
-  qdrant:
-    image: qdrant/qdrant:latest
-    ports:
-      - "6333:6333"
-    volumes:
-      - qdrant_data:/qdrant/storage
     networks:
       - paperless-network
 
@@ -190,8 +182,6 @@ services:
 
 volumes:
   postgres_data:
-  chroma_data:
-  qdrant_data:
   pgvector_data:
 
 networks:

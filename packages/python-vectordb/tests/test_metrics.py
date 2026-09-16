@@ -1,10 +1,8 @@
-"""Unit tests for the cross-adapter similarity metric mapping module."""
+"""Unit tests for the PGVector similarity metric mapping module."""
 import pytest
 
 from python_vectordb.vector_db.metrics import (
-    CHROMA_SPACES,
     PGVECTOR_OPERATORS,
-    QDRANT_DISTANCES,
     VALID_METRICS,
     normalize_pgvector_score,
     resolve_keyword_method,
@@ -13,7 +11,7 @@ from python_vectordb.vector_db.metrics import (
 
 
 def test_valid_metric_names():
-    assert VALID_METRICS == ("cosine", "euclidean", "dot", "manhattan")
+    assert VALID_METRICS == ("cosine", "euclidean", "dot")
 
 
 def test_validate_metric_normalizes_case():
@@ -26,15 +24,6 @@ def test_validate_metric_rejects_unknown():
         validate_metric("hamming")
 
 
-def test_mapping_tables_consistency():
-    # userland/manhattan is Qdrant-only.
-    assert "cosine" in CHROMA_SPACES
-    assert "cosine" in PGVECTOR_OPERATORS
-    assert "manhattan" in QDRANT_DISTANCES
-    assert "manhattan" not in CHROMA_SPACES
-    assert "manhattan" not in PGVECTOR_OPERATORS
-
-
 def test_pgvector_operators():
     assert PGVECTOR_OPERATORS == {
         "cosine": "<=>",
@@ -43,37 +32,14 @@ def test_pgvector_operators():
     }
 
 
-def test_chroma_spaces():
-    assert CHROMA_SPACES == {
-        "cosine": "cosine",
-        "euclidean": "l2",
-        "dot": "ip",
-    }
-
-
-def test_qdrant_distances():
-    assert QDRANT_DISTANCES == {
-        "cosine": "COSINE",
-        "euclidean": "EUCLID",
-        "dot": "DOT",
-        "manhattan": "MANHATTAN",
-    }
-
-
 def test_resolve_keyword_method_auto_defaults():
-    assert resolve_keyword_method("qdrant") == "native"
     assert resolve_keyword_method("pgvector") == "fts"
-    assert resolve_keyword_method("chroma") == "local"
-    assert resolve_keyword_method("unknown") == "local"
+    assert resolve_keyword_method("unknown") == "fts"
 
 
 def test_resolve_keyword_method_explicit_override():
-    assert resolve_keyword_method("qdrant", "local") == "local"
-    assert resolve_keyword_method("chroma", "NATIVE") == "native"
-
-
-def test_resolve_keyword_method_auto_with_unknown_is_local():
-    assert resolve_keyword_method("sphinx") == "local"
+    assert resolve_keyword_method("pgvector", "local") == "local"
+    assert resolve_keyword_method("pgvector", "NATIVE") == "native"
 
 
 @pytest.mark.parametrize(

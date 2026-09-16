@@ -1,25 +1,21 @@
-"""Cross-adapter similarity metric mapping and score normalization.
+"""Similarity metric mapping and score normalization for PGVector.
 
-The vector database adapters accept a normalized, database-agnostic metric
-name (``SIMILARITY_METRIC``) and translate it to their native distance
-operator / space / enum via the mapping tables below. Scores are normalized
-so that "higher = more similar" across all metrics where native values need
+The vector database adapter accepts a normalized, database-agnostic metric
+name (``SIMILARITY_METRIC``) and translates it to the native PostgreSQL
+distance operator via the mapping table below. Scores are normalized so
+that "higher = more similar" across all metrics where native values need
 rescaling.
 
-Supported metrics: ``cosine``, ``euclidean``, ``dot``, ``manhattan``.
-``manhattan`` is only supported by Qdrant; choosing it for Chroma or
-PGVector raises a ``KeyError`` at adapter use time.
+Supported metrics: ``cosine``, ``euclidean``, ``dot``.
 """
 
 from typing import Dict
 
-VALID_METRICS: tuple[str, ...] = ("cosine", "euclidean", "dot", "manhattan")
+VALID_METRICS: tuple[str, ...] = ("cosine", "euclidean", "dot")
 
 # Keyword retrieval strategy per vector database type.
 KEYWORD_DEFAULTS: Dict[str, str] = {
-    "qdrant": "native",    # Qdrant native BM25 query + fusion
-    "pgvector": "fts",     # PostgreSQL tsvector / ts_rank full text search
-    "chroma": "local",     # in-adapter local BM25 index (rank-bm25 + nltk)
+    "pgvector": "fts",  # PostgreSQL tsvector / ts_rank full text search
 }
 
 
@@ -31,28 +27,13 @@ def resolve_keyword_method(db_type: str, method: str = "auto") -> str:
     """
     if method != "auto":
         return method.lower()
-    return KEYWORD_DEFAULTS.get(db_type.lower(), "local")
+    return KEYWORD_DEFAULTS.get(db_type.lower(), "fts")
 
 # PGVector distance operators used in ORDER BY and the SELECT score expression.
 PGVECTOR_OPERATORS: Dict[str, str] = {
     "cosine": "<=>",
     "euclidean": "<->",
     "dot": "<#>",
-}
-
-# ChromaDB ``hnsw:space`` values. Set once at collection creation time.
-CHROMA_SPACES: Dict[str, str] = {
-    "cosine": "cosine",
-    "euclidean": "l2",
-    "dot": "ip",
-}
-
-# Qdrant Distance enum member names (resolved via getattr(models.Distance, _)).
-QDRANT_DISTANCES: Dict[str, str] = {
-    "cosine": "COSINE",
-    "euclidean": "EUCLID",
-    "dot": "DOT",
-    "manhattan": "MANHATTAN",
 }
 
 

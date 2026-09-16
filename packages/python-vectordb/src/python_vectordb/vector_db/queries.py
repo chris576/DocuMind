@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -26,3 +27,21 @@ class HybridSearchQuery:
 @dataclass
 class GetStatusQuery:
     """Return the current status of the vector database."""
+
+
+@dataclass
+class FactsQuery:
+    """Query denormalized facts from the document fact table.
+
+    Filters on namespace/document_type/key/value plus an optional numeric
+    aggregation (sum/avg/min/max/count) over the ``key`` column in ``extracted``.
+    """
+
+    document_type: str | None = None
+    key: str | None = None
+    value: Any = None
+    from_date: str | None = None
+    to_date: str | None = None
+    namespace: str | None = None
+    limit: int = 100
+    aggregate: str | None = None

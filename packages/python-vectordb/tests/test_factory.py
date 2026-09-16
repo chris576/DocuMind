@@ -16,7 +16,7 @@ def test_create_adapter_unknown_type(mock_embed):
 @patch("python_vectordb.vector_db.factory.EmbeddingProviderFactory.create")
 def test_create_writer_returns_bus(mock_embed):
     mock_embed.return_value = MagicMock()
-    bus = VectorDBFactory.create_writer({"type": "chroma"})
+    bus = VectorDBFactory.create_writer({"type": "pgvector"})
     assert isinstance(bus, VectorDBCommandBus)
 
 
@@ -29,7 +29,7 @@ def test_create_reader_initializes(mock_embed):
         mock_adapter.initialize.return_value = True
         mock_create.return_value = mock_adapter
 
-        bus = VectorDBFactory.create_reader({"type": "chroma"})
+        bus = VectorDBFactory.create_reader({"type": "pgvector"})
         assert isinstance(bus, VectorDBCommandBus)
         mock_adapter.initialize.assert_called_once()
 
@@ -40,7 +40,7 @@ def test_create_full_access(mock_embed):
         "python_vectordb.vector_db.factory.VectorDBFactory._create_adapter"
     ) as mock_create:
         mock_create.return_value = MagicMock()
-        bus = VectorDBFactory.create({"type": "chroma"})
+        bus = VectorDBFactory.create({"type": "pgvector"})
         assert isinstance(bus, VectorDBCommandBus)
         # Full access bus has both writer and reader.
         assert bus._writer is not None
@@ -48,15 +48,15 @@ def test_create_full_access(mock_embed):
 
 
 def test_factory_registry_contains_all():
-    assert set(VectorDBFactory._REGISTRY) == {"chroma", "qdrant", "pgvector"}
+    assert set(VectorDBFactory._REGISTRY) == {"pgvector"}
 
 
 @patch("python_vectordb.vector_db.factory.EmbeddingProviderFactory.create")
 def test_create_writers_shares_embedding(mock_embed):
     mock_embed.return_value = MagicMock(dimension=384)
-    writers = VectorDBFactory.create_writers({"type": "chroma"}, ["c1", "c2"])
+    writers = VectorDBFactory.create_writers({"type": "pgvector"}, ["c1", "c2"])
     assert set(writers) == {"c1", "c2"}
-    # The embedding model is loaded exactly once, not once per collection.
+    # The embedding model is loaded exactly once, not once per namespace.
     assert mock_embed.call_count == 1
     for bus in writers.values():
         assert isinstance(bus, VectorDBCommandBus)
@@ -71,11 +71,11 @@ def test_create_readers_shares_embedding(mock_embed):
         mock_adapter.initialize.return_value = True
         mock_create.return_value = mock_adapter
 
-        readers = VectorDBFactory.create_readers({"type": "chroma"}, ["c1", "c2"])
+        readers = VectorDBFactory.create_readers({"type": "pgvector"}, ["c1", "c2"])
         assert set(readers) == {"c1", "c2"}
-        # One embedding provider, shared across the per-collection readers.
+        # One embedding provider, shared across the per-namespace readers.
         assert mock_embed.call_count == 1
-        # One adapter per collection, each initialized eagerly.
+        # One adapter per namespace, each initialized eagerly.
         assert mock_create.call_count == 2
         assert mock_adapter.initialize.call_count == 2
         for bus in readers.values():

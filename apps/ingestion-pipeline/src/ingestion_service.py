@@ -117,8 +117,11 @@ class IngestionService:
                     "title": doc.title,
                     "correspondent": doc.correspondent,
                     "created": doc.created,
-                    "tags": ", ".join(doc.tags),
+                    "tags": list(doc.tags),
+                    "document_type": doc.document_type,
+                    "storage_path": doc.storage_path,
                     "hash": doc.hash,
+                    **doc.metadata,
                 },
             )
             for doc in documents

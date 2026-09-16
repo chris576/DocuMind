@@ -30,10 +30,7 @@ const envSchema = z.object({
   OPENCODE_MODEL: z.string().optional(),
   
   // Vector DB
-  VECTOR_DB_TYPE: z.enum(['chroma', 'qdrant', 'pgvector']).default('chroma'),
-  CHROMA_URL: z.string().default('http://localhost:8000'),
-  QDRANT_URL: z.string().optional(),
-  QDRANT_API_KEY: z.string().optional(),
+  VECTOR_DB_TYPE: z.enum(['pgvector']).default('pgvector'),
   PGVECTOR_URL: z.string().optional(),
   
   // External API

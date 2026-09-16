@@ -246,6 +246,35 @@ class PaperlessDocumentProvider(DocumentProvider):
         return [tag for tag in tags if tag]
 
     @staticmethod
+    def _coerce_custom_field_value(data_type: str, value: Any) -> Any:
+        """Coerce a Paperless custom-field value based on its declared type.
+
+        Paperless delivers most scalar values as strings; numeric and boolean
+        fields are converted so downstream filters/aggregations operate on
+        proper types. Lists/dicts (document links, multi-select) are serialized
+        to JSON to keep the metadata flat.
+        """
+        if value is None or value == "":
+            return value
+        if isinstance(value, (list, dict)):
+            return json.dumps(value, ensure_ascii=False)
+        if data_type == "integer":
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return value
+        if data_type in ("float", "monetary"):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return value
+        if data_type == "boolean":
+            if isinstance(value, bool):
+                return value
+            return str(value).lower() in ("true", "1", "yes")
+        return value
+
+    @staticmethod
     def _normalize_custom_fields(
         custom_fields: List[Dict[str, Any]], lookup: Dict[Any, Dict[str, str]]
     ) -> Dict[str, Any]:
@@ -254,17 +283,20 @@ class PaperlessDocumentProvider(DocumentProvider):
         Scalar values (str/int/float/bool) are passed through directly; list and
         dict values (document links, select options) are serialized to JSON so
         the resulting metadata stays flat and filterable by the vector database.
+        Numeric/boolean values are coerced from their string representation using
+        the field's declared ``data_type``.
         """
         normalized: Dict[str, Any] = {}
         for instance in custom_fields or []:
             field_id = instance.get("field")
             field_info = lookup.get(field_id, {})
             name = field_info.get("name") or f"id_{field_id}"
+            data_type = field_info.get("data_type", "")
             value = instance.get("value")
 
-            if isinstance(value, (list, dict)):
-                value = json.dumps(value, ensure_ascii=False)
-
+            value = PaperlessDocumentProvider._coerce_custom_field_value(
+                data_type, value
+            )
             normalized[f"custom_fields.{name}"] = value
 
         return normalized

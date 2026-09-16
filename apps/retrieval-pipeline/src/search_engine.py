@@ -25,16 +25,12 @@ class RerankerNotInitializedError(Exception):
 
 class SearchEngine:
     def __init__(self, config: dict):
-        self.vector_db_type = config.get("vector_db_type", "chroma")
-        self.chroma_url = config.get("chroma_url", "http://localhost:8000")
-        self.qdrant_url = config.get("qdrant_url", "http://localhost:6333")
-        self.qdrant_api_key = config.get("qdrant_api_key")
-        self.pgvector_url = config.get("pgvector_url")
-        self.collection_name = config.get("collection_name", "documents")
+        self.config = dict(config)
+        self.vector_db_type = config.get("type", config.get("vector_db_type", "pgvector"))
+        self.collection_name = config.get("collection", config.get("collection_name", "documents"))
         self.collections: List[str] = config.get("collections") or [self.collection_name]
         self.embedding_model_name = config.get("embedding_model", "paraphrase-multilingual-MiniLM-L12-v2")
         self.embedding_provider = config.get("embedding_provider", "sentence_transformer")
-        self.similarity_metric = config.get("similarity_metric", "cosine")
         self.cross_encoder_model_name = config.get("cross_encoder_model", "cross-encoder/ms-marco-MiniLM-L-6-v2")
         self.max_results = config.get("max_results", 20)
 
@@ -48,22 +44,12 @@ class SearchEngine:
         self.status = SearchEngineStatus()
 
     def _vector_db_config(self) -> dict:
-        db_type = self.vector_db_type.lower()
-        db_config = {
-            "type": db_type,
-            "collection": self.collection_name,
-            "embedding_model": self.embedding_model_name,
-            "embedding_provider": self.embedding_provider,
-            "similarity_metric": self.similarity_metric,
-        }
-        if db_type == "chroma":
-            db_config["url"] = self.chroma_url
-        elif db_type == "qdrant":
-            db_config["url"] = self.qdrant_url
-            db_config["api_key"] = self.qdrant_api_key
-        elif db_type == "pgvector":
-            db_config["url"] = self.pgvector_url
-        return db_config
+        """Build the config dict for VectorDBFactory (PGVector-only).
+
+        The config already carries url/collection/embedding/reranking knobs;
+        only the ``type`` key is normalized for the factory.
+        """
+        return {**self.config, "type": self.vector_db_type}
 
     def initialize(self) -> bool:
         try:

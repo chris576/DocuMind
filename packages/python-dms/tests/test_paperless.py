@@ -275,6 +275,25 @@ def test_normalize_custom_fields_scalar_passthrough():
     assert flat["custom_fields.id_10"] is True
 
 
+def test_normalize_custom_fields_coerces_numeric_types():
+    lookup = {
+        7: {"name": "anzahl", "data_type": "integer"},
+        8: {"name": "betrag", "data_type": "monetary"},
+        9: {"name": "aktiv", "data_type": "boolean"},
+    }
+    flat = PaperlessDocumentProvider._normalize_custom_fields(
+        [
+            {"field": 7, "value": "42"},
+            {"field": 8, "value": "19.99"},
+            {"field": 9, "value": "true"},
+        ],
+        lookup,
+    )
+    assert flat["custom_fields.anzahl"] == 42
+    assert flat["custom_fields.betrag"] == 19.99
+    assert flat["custom_fields.aktiv"] is True
+
+
 @patch("python_dms.paperless.requests.get")
 def test_fetch_documents_hash_fallback(mock_get):
     def fake_get(url, headers=None, params=None, timeout=30):

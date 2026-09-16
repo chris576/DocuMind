@@ -1,11 +1,15 @@
 [project]
-name = "python-vectordb"
+name = "dms-rag-extraction"
 version = "1.0.0"
-description = "Vector database, embedding and reranking components for DMS-RAG"
+description = "Asynchronous structured fact extraction pipeline for DMS-RAG"
 requires-python = ">=3.11"
 dependencies = [
-    "sentence-transformers>=3.3.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "python-dotenv>=1.0.0",
     "psycopg2-binary>=2.9.0",
+    "python-common @ file:///../../packages/python-common",
+    "python-llm @ file:///../../packages/python-llm",
 ]
 
 [project.optional-dependencies]
@@ -22,7 +26,7 @@ testpaths = ["tests"]
 addopts = "--cov --cov-report=term-missing --cov-fail-under=75"
 
 [tool.coverage.run]
-source = ["python_vectordb"]
+source = ["src", "main"]
 
 # Clean-Code-Linting: Fehler (E/F), Bugbear (B), Komplexität (C90),
 # Pylint-Idiome (PL), Vereinfachung (SIM). Bewusste Ausnahmen für Bestands-
@@ -58,26 +62,10 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_return_any = true
-# Externe, untypisierte Abhängigkeiten (psycopg2) werden übersprungen statt
-# analysiert; numpy-Stubs sind py312-inkompatibel.
+# Lokale Utility-Packages sind bewusst untypisiert (kein py.typed).
+# Mypy überspringt sie statt sie zu analysieren.
 ignore_missing_imports = true
 
 [tool.bandit]
 exclude_dirs = ["tests"]
-skips = [
-    "B608",  # SQL-Interpolation: nur Config-Werte (Tabellenname, Operator,
-    #          fts_language); alle Suchwerte sind per %s parametrisiert
-]
-
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-packages = [
-    "python_vectordb",
-    "python_vectordb.embeddings",
-    "python_vectordb.reranking",
-    "python_vectordb.vector_db",
-]
+skips = ["B104"]  # host="0.0.0.0": bewusste FastAPI/Docker-Bindung

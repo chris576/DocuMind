@@ -17,7 +17,7 @@ from python_vectordb.vector_db.commands import (
     IndexDocumentsCommand,
     InitializeCommand,
 )
-from python_vectordb.vector_db.queries import GetStatusQuery, HybridSearchQuery, SearchQuery
+from python_vectordb.vector_db.queries import FactsQuery, GetStatusQuery, HybridSearchQuery, SearchQuery
 
 
 def _writer():
@@ -97,6 +97,15 @@ def test_ask_unknown_query():
     bus = VectorDBCommandBus(reader=_reader())
     with pytest.raises(UnknownQueryError):
         bus.ask("nope")
+
+
+def test_ask_facts():
+    r = _reader()
+    bus = VectorDBCommandBus(reader=r)
+    query = FactsQuery(document_type="Rechnung", key="invoice_number")
+    r.query_facts.return_value = {"items": [], "count": 0}
+    assert bus.ask(query) == {"items": [], "count": 0}
+    r.query_facts.assert_called_once_with(query)
 
 
 def test_ask_write_only_raises():
