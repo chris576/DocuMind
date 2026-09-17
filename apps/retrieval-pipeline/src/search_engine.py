@@ -135,9 +135,7 @@ class SearchEngine:
                 merged.append(doc)
         return merged
 
-    def _apply_filters(
-        self, results: List[dict], request: SearchRequest
-    ) -> List[dict]:
+    def _apply_filters(self, results: List[dict], request: SearchRequest) -> List[dict]:
         """Apply date/correspondent filters to raw search results."""
         if not (request.from_date or request.to_date or request.correspondent):
             return results
@@ -155,10 +153,7 @@ class SearchEngine:
                     include = False
 
             if request.correspondent and result.get("correspondent"):
-                if (
-                    request.correspondent.lower()
-                    not in result["correspondent"].lower()
-                ):
+                if request.correspondent.lower() not in result["correspondent"].lower():
                     include = False
 
             if include:
@@ -238,9 +233,7 @@ class SearchEngine:
         if not self.is_initialized and not self.initialize():
             raise VectorDBNotInitializedError("Vector database not initialized")
 
-        results = self._collect_results(
-            request.query, request.max_results, request.collections
-        )
+        results = self._collect_results(request.query, request.max_results, request.collections)
         results = self._apply_filters(results, request)
         reranked = self.rerank_results(request.query, results, request.max_results)
 

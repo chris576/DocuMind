@@ -119,9 +119,7 @@ def test_add_documents_to_vector_db_initializes_if_needed():
 def test_add_documents_merges_custom_fields_into_metadata():
     svc, _provider, bus = _service()
     bus.execute.side_effect = lambda cmd: True if isinstance(cmd, InitializeCommand) else None
-    svc.add_documents_to_vector_db(
-        [_doc("1", metadata={"custom_fields.rechnungsnr": "ABC-123"})]
-    )
+    svc.add_documents_to_vector_db([_doc("1", metadata={"custom_fields.rechnungsnr": "ABC-123"})])
     index_cmd = [c.args[0] for c in bus.execute.call_args_list if isinstance(c.args[0], IndexDocumentsCommand)]
     meta = index_cmd[0].documents[0].metadata
     assert meta["custom_fields.rechnungsnr"] == "ABC-123"
