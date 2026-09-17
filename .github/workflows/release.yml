@@ -116,6 +116,19 @@ jobs:
             ghcr.io/chris576/documind/generation-pipeline:${{ steps.version.outputs.version }}
             ghcr.io/chris576/documind/generation-pipeline:latest
 
+      - name: Build & push extraction-pipeline
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/extraction-pipeline/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ghcr.io/chris576/documind/extraction-pipeline:${{ steps.version.outputs.version }}
+            ghcr.io/chris576/documind/extraction-pipeline:latest
+
   release:
     name: Create GitHub Release
     needs: build-and-push

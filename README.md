@@ -45,13 +45,19 @@ Powered by **Retrieval-Augmented Generation (RAG)**, you can now search semantic
 - Semantic memory powered by your own data
 - Fast, intelligent, privacy-friendly document queries
 
+### 📊 Structured Fact Extraction (ELT)
+- Denormalized facts (`raw_json` + LLM-extracted `extracted` JSONB) stored alongside embeddings
+- Exact lookups and aggregation on typed facts (invoice numbers, amounts, tax numbers)
+- Async extraction pipeline (port 8004) with an append-only `fact_keys` catalog
+- Lazy normalization via SQL views / generated columns when needed
+
 ### 🏗️ Modern Monorepo Architecture
 - pnpm + Turbo workspace (`apps/*` + `packages/*`)
 - NestJS 10 backend (`apps/backend`, port 3001)
 - Vite 6 + React 18 frontend (`apps/frontend`, port 3000)
-- Python pipelines (FastAPI): Ingestion (8001), Retrieval (8002), Generation (8003)
+- Python pipelines (FastAPI): Ingestion (8001), Retrieval (8002), Generation (8003), Extraction (8004)
 - Direct HTTP REST communication between backend and pipelines (FastAPI)
-- Vector-DB factory: Chroma / Qdrant / PGVector
+- PostgreSQL/PGVector fact store: embeddings + denormalized facts in one table (`document_facts`)
 - TypeScript 7 (native Go compiler) across the monorepo — the backend stays on TS 5.9 for NestJS toolchain compatibility
 
 ---
@@ -74,9 +80,9 @@ curl -fsSL https://raw.githubusercontent.com/chris576/documind/main/install.sh |
 Der Installer unterstützt:
 
 - **DMS**: Paperless-ngx (funktionsfähig) / Docspell (Platzhalter)
-- **VectorDB**: Chroma, Qdrant oder PGVector — jeweils **neu anlegen** (Container
-  wird gestartet) oder **bestehende Verbindung** nutzen (z. B. Paperless-Postgres
-  als PGVector, sofern die `vector`-Extension installiert ist)
+- **VectorDB**: PostgreSQL/PGVector — **neu anlegen** (Container wird gestartet)
+  oder **bestehende Verbindung** nutzen (z. B. Paperless-Postgres als PGVector,
+  sofern die `vector`-Extension installiert ist)
 - **LLM**: OpenAI, Ollama, Anthropic oder Custom (OpenAI-kompatibel)
 - **Hybrid-Suche**: Keyword-Methode je DB (auto/native/fts/local) + Gewichtung
 
@@ -107,8 +113,9 @@ Services:
 | Ingestion pipeline | http://localhost:8001 |
 | Retrieval pipeline | http://localhost:8002 |
 | Generation pipeline | http://localhost:8003 |
+| Extraction pipeline | http://localhost:8004 |
 | PostgreSQL | 5432 |
-| ChromaDB | 8000 |
+| PGVector | 5432 (Host 5433) |
 
 ### 🔧 Local Development
 
@@ -155,7 +162,7 @@ flowchart LR
    git tag v1.2.3
    git push origin v1.2.3
    ```
-   `release.yml` baut alle 5 Images für `linux/amd64` und `linux/arm64`,
+   `release.yml` baut alle 6 Images für `linux/amd64` und `linux/arm64`,
    pusht sie nach GHCR (`ghcr.io/chris576/documind/<service>:<version>` +
    `:latest`), publiziert den MCP-Server auf npm und legt ein GitHub Release an.
 
@@ -178,6 +185,7 @@ In **Settings → Branches → Add rule** für `main` aktivieren:
 | Ingestion | `ghcr.io/chris576/documind/ingestion-pipeline` |
 | Retrieval | `ghcr.io/chris576/documind/retrieval-pipeline` |
 | Generation | `ghcr.io/chris576/documind/generation-pipeline` |
+| Extraction | `ghcr.io/chris576/documind/extraction-pipeline` |
 
 Tags: `<version>` (z. B. `v1.2.3` → `1.2.3`) und `latest`. Alle Images werden
 als Multi-Arch-Manifest (`linux/amd64`, `linux/arm64`) veröffentlicht.
@@ -210,7 +218,7 @@ und lässt sich direkt per `npx` in Agenten einbinden:
 - ✅ Multi-AI model support
 - ✅ Multilingual document analysis
 - ✅ Integrated document chat with RAG
-- ✅ Vector-DB factory (Chroma / Qdrant / PGVector)
+- ✅ PostgreSQL/PGVector fact store with structured fact extraction
 - 🚧 MCP server for agent access (Hermes, OpenClaw, …)
 - 🚧 Additional connectors (generic REST/OData, Nextcloud/WebDAV, ELO, d.velop, windream, DATEV)
 

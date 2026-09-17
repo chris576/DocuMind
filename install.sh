@@ -47,14 +47,15 @@ declare -A VARS
 # Alle möglichen Schlüssel initialisieren (verhindert "unbound variable" bei set -u)
 for _k in IMAGE_REGISTRY IMAGE_TAG DOCUMENT_PROVIDER DOCUMENT_PROVIDER_URL \
           DOCUMENT_PROVIDER_TOKEN PAPERLESS_API_URL PAPERLESS_API_TOKEN \
-          PAPERLESS_USERNAME VECTOR_DB_TYPE VECTOR_DB_MODE CHROMA_URL QDRANT_URL \
-          QDRANT_API_KEY PGVECTOR_URL KEYWORD_METHOD KEYWORD_WEIGHT SEMANTIC_WEIGHT \
-          FTS_LANGUAGE KEYWORD_INDEX_FILE LLM_PROVIDER LLM_MODEL OPENAI_API_KEY \
+          PAPERLESS_USERNAME VECTOR_DB_TYPE VECTOR_DB_MODE PGVECTOR_URL \
+          KEYWORD_METHOD KEYWORD_WEIGHT SEMANTIC_WEIGHT FTS_LANGUAGE \
+          LLM_PROVIDER LLM_MODEL OPENAI_API_KEY \
           OLLAMA_BASE_URL ANTHROPIC_API_KEY CUSTOM_BASE_URL CUSTOM_API_KEY \
           CUSTOM_MODEL OPENCODE_BASE_URL OPENCODE_USERNAME OPENCODE_PASSWORD \
           OPENCODE_MODEL BACKEND_PORT DATABASE_URL BACKEND_DB_MODE JWT_SECRET API_KEY \
           INGESTION_PORT INGESTION_HOST_PORT RETRIEVAL_PORT RETRIEVAL_HOST_PORT \
-          GENERATION_PORT GENERATION_HOST_PORT \
+          GENERATION_PORT GENERATION_HOST_PORT EXTRACTION_PORT EXTRACTION_HOST_PORT \
+          FACT_TABLE EXTRACTION_BATCH_SIZE \
           EXTERNAL_API_ENABLED PAPERLESS_AI_INITIAL_SETUP SCAN_INTERVAL \
           PROCESS_PREDEFINED_DOCUMENTS TAGS ADD_AI_PROCESSED_TAG AI_PROCESSED_TAG_NAME \
           USE_PROMPT_TAGS PROMPT_TAGS USE_EXISTING_DATA SYSTEM_PROMPT \
@@ -261,50 +262,23 @@ configure_dms() {
 configure_vector_db() {
   echo ""
   echo -e "${CYAN}=== 3/7 Vektor-Datenbank ===${NC}"
-  select_option VECTOR_DB_TYPE "Vektor-Datenbank" chroma qdrant pgvector
+  VARS["VECTOR_DB_TYPE"]="pgvector"
+  info "Vektor-Datenbank: PostgreSQL/PGVector (fester Stack)."
   select_option VECTOR_DB_MODE "Modus" new existing
-  case "${VARS[VECTOR_DB_TYPE]}" in
-    chroma)
-      if [ "${VARS[VECTOR_DB_MODE]}" = "new" ]; then
-        VARS["CHROMA_URL"]="http://chromadb:8000"
-        info "Chroma wird als Container 'chromadb' gestartet (URL: ${VARS[CHROMA_URL]})."
-      else
-        prompt_url "CHROMA_URL" "Bestehende Chroma-URL"
-      fi
-      ;;
-    qdrant)
-      if [ "${VARS[VECTOR_DB_MODE]}" = "new" ]; then
-        VARS["QDRANT_URL"]="http://qdrant:6333"
-        info "Qdrant wird als Container 'qdrant' gestartet (URL: ${VARS[QDRANT_URL]})."
-        VARS["QDRANT_API_KEY"]="${VARS[QDRANT_API_KEY]:-}"
-        prompt "QDRANT_API_KEY" "Qdrant API-Key (optional)"
-      else
-        prompt_url "QDRANT_URL" "Bestehende Qdrant-URL"
-        prompt "QDRANT_API_KEY" "Qdrant API-Key (optional)"
-      fi
-      ;;
-    pgvector)
-      if [ "${VARS[VECTOR_DB_MODE]}" = "new" ]; then
-        VARS["PGVECTOR_URL"]="postgresql://paperless:paperless@pgvector:5432/paperless_ai"
-        info "PGVector wird als Container 'pgvector' gestartet."
-      else
-        warn "Bestehende Postgres/PGVector-Verbindung (z.B. Paperless-Postgres)."
-        warn "Hinweis: Die 'vector'-Extension muss installiert sein: CREATE EXTENSION vector;"
-        prompt_required "PGVECTOR_URL" "PGVector-Verbindungs-URL (postgresql://...)"
-      fi
-      ;;
-  esac
+  if [ "${VARS[VECTOR_DB_MODE]}" = "new" ]; then
+    VARS["PGVECTOR_URL"]="postgresql://paperless:paperless@pgvector:5432/paperless_ai"
+    info "PGVector wird als Container 'pgvector' gestartet."
+  else
+    warn "Bestehende Postgres/PGVector-Verbindung (z.B. Paperless-Postgres)."
+    warn "Hinweis: Die 'vector'-Extension muss installiert sein: CREATE EXTENSION vector;"
+    prompt_required "PGVECTOR_URL" "PGVector-Verbindungs-URL (postgresql://...)"
+  fi
 }
 
 configure_keyword() {
   echo ""
   echo -e "${CYAN}=== 4/7 Hybrid-Suche / Keyword (BM25) ===${NC}"
-  local kw_options=()
-  case "${VARS[VECTOR_DB_TYPE]}" in
-    qdrant)   kw_options=(auto native) ;;
-    pgvector) kw_options=(auto fts) ;;
-    chroma)   kw_options=(auto local) ;;
-  esac
+  local kw_options=(auto fts)
   VARS["KEYWORD_METHOD"]="${VARS[KEYWORD_METHOD]:-auto}"
   select_option KEYWORD_METHOD "Keyword-Methode" "${kw_options[@]}"
   VARS["KEYWORD_WEIGHT"]="${VARS[KEYWORD_WEIGHT]:-0.3}"
@@ -313,8 +287,6 @@ configure_keyword() {
   prompt "SEMANTIC_WEIGHT" "Semantik-Gewicht (0-1)"
   VARS["FTS_LANGUAGE"]="${VARS[FTS_LANGUAGE]:-german}"
   prompt "FTS_LANGUAGE" "FTS-Sprache (pgvector)"
-  VARS["KEYWORD_INDEX_FILE"]="${VARS[KEYWORD_INDEX_FILE]:-/app/data/bm25_index.pkl}"
-  prompt "KEYWORD_INDEX_FILE" "BM25-Index-Datei (im Container)"
 }
 
 configure_llm() {
@@ -432,17 +404,16 @@ apply_quickstart_defaults() {
   VARS["DOCUMENT_PROVIDER_URL"]="${VARS[DOCUMENT_PROVIDER_URL]:-${VARS[PAPERLESS_API_URL]}}"
   VARS["DOCUMENT_PROVIDER_TOKEN"]="${VARS[DOCUMENT_PROVIDER_TOKEN]:-${VARS[PAPERLESS_API_TOKEN]}}"
 
-  # VectorDB: Chroma neu
-  VARS["VECTOR_DB_TYPE"]="${VARS[VECTOR_DB_TYPE]:-chroma}"
+  # VectorDB: PGVector neu
+  VARS["VECTOR_DB_TYPE"]="${VARS[VECTOR_DB_TYPE]:-pgvector}"
   VARS["VECTOR_DB_MODE"]="${VARS[VECTOR_DB_MODE]:-new}"
-  VARS["CHROMA_URL"]="${VARS[CHROMA_URL]:-http://chromadb:8000}"
+  VARS["PGVECTOR_URL"]="${VARS[PGVECTOR_URL]:-postgresql://paperless:paperless@pgvector:5432/paperless_ai}"
 
   # Hybrid-Suche
   VARS["KEYWORD_METHOD"]="${VARS[KEYWORD_METHOD]:-auto}"
   VARS["KEYWORD_WEIGHT"]="${VARS[KEYWORD_WEIGHT]:-0.3}"
   VARS["SEMANTIC_WEIGHT"]="${VARS[SEMANTIC_WEIGHT]:-0.7}"
   VARS["FTS_LANGUAGE"]="${VARS[FTS_LANGUAGE]:-german}"
-  VARS["KEYWORD_INDEX_FILE"]="${VARS[KEYWORD_INDEX_FILE]:-/app/data/bm25_index.pkl}"
 
   # LLM: Ollama
   VARS["LLM_PROVIDER"]="${VARS[LLM_PROVIDER]:-ollama}"
@@ -459,6 +430,10 @@ apply_quickstart_defaults() {
   VARS["RETRIEVAL_HOST_PORT"]="${VARS[RETRIEVAL_HOST_PORT]:-${VARS[RETRIEVAL_PORT]}}"
   VARS["GENERATION_PORT"]="${VARS[GENERATION_PORT]:-8003}"
   VARS["GENERATION_HOST_PORT"]="${VARS[GENERATION_HOST_PORT]:-${VARS[GENERATION_PORT]}}"
+  VARS["EXTRACTION_PORT"]="${VARS[EXTRACTION_PORT]:-8004}"
+  VARS["EXTRACTION_HOST_PORT"]="${VARS[EXTRACTION_HOST_PORT]:-${VARS[EXTRACTION_PORT]}}"
+  VARS["FACT_TABLE"]="${VARS[FACT_TABLE]:-document_facts}"
+  VARS["EXTRACTION_BATCH_SIZE"]="${VARS[EXTRACTION_BATCH_SIZE]:-10}"
   VARS["EXTERNAL_API_ENABLED"]="${VARS[EXTERNAL_API_ENABLED]:-no}"
 
   # Secrets
@@ -501,18 +476,13 @@ write_config() {
     echo '    "rerankerProvider": "cross_encoder",'
     echo '    "crossEncoderModel": "cross-encoder/ms-marco-MiniLM-L-6-v2",'
     echo '    "similarityMetric": "cosine"'
-    case "${VARS[VECTOR_DB_TYPE]}" in
-      chroma)   [ -n "${VARS[CHROMA_URL]:-}" ]   && echo ",    \"chromaUrl\": \"${VARS[CHROMA_URL]}\"" ;;
-      qdrant)   [ -n "${VARS[QDRANT_URL]:-}" ]   && echo ",    \"qdrantUrl\": \"${VARS[QDRANT_URL]}\"" ;;
-      pgvector) [ -n "${VARS[PGVECTOR_URL]:-}" ] && echo ",    \"pgvectorUrl\": \"${VARS[PGVECTOR_URL]}\"" ;;
-    esac
+    [ -n "${VARS[PGVECTOR_URL]:-}" ] && echo ",    \"pgvectorUrl\": \"${VARS[PGVECTOR_URL]}\""
     echo '  },'
     echo '  "hybridSearch": {'
     echo "    \"keywordMethod\": \"${VARS[KEYWORD_METHOD]}\","
     echo "    \"keywordWeight\": ${VARS[KEYWORD_WEIGHT]},"
     echo "    \"semanticWeight\": ${VARS[SEMANTIC_WEIGHT]},"
-    echo "    \"ftsLanguage\": \"${VARS[FTS_LANGUAGE]}\","
-    echo "    \"keywordIndexFile\": \"${VARS[KEYWORD_INDEX_FILE]}\""
+    echo "    \"ftsLanguage\": \"${VARS[FTS_LANGUAGE]}\""
     echo '  },'
     echo '  "retrieval": { "maxResults": 20 }'
     echo '}'
@@ -562,17 +532,14 @@ RERANKER_PROVIDER=cross_encoder
 CROSS_ENCODER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
 COLLECTION_NAME=documents
 SIMILARITY_METRIC=cosine
-CHROMA_URL="${VARS[CHROMA_URL]}"
-QDRANT_URL="${VARS[QDRANT_URL]}"
-QDRANT_API_KEY="${VARS[QDRANT_API_KEY]}"
 PGVECTOR_URL="${VARS[PGVECTOR_URL]}"
+FACT_TABLE="${VARS[FACT_TABLE]:-document_facts}"
 
 # --- 4. Hybrid-Suche / Keyword (BM25) ---
 KEYWORD_METHOD="${VARS[KEYWORD_METHOD]}"
 KEYWORD_WEIGHT="${VARS[KEYWORD_WEIGHT]}"
 SEMANTIC_WEIGHT="${VARS[SEMANTIC_WEIGHT]}"
 FTS_LANGUAGE="${VARS[FTS_LANGUAGE]}"
-KEYWORD_INDEX_FILE="${VARS[KEYWORD_INDEX_FILE]}"
 
 # --- 5. LLM ---
 LLM_PROVIDER="${VARS[LLM_PROVIDER]}"
@@ -604,9 +571,12 @@ RETRIEVAL_PORT="${VARS[RETRIEVAL_PORT]}"
 RETRIEVAL_HOST_PORT="${VARS[RETRIEVAL_HOST_PORT]}"
 GENERATION_PORT="${VARS[GENERATION_PORT]}"
 GENERATION_HOST_PORT="${VARS[GENERATION_HOST_PORT]}"
+EXTRACTION_PORT="${VARS[EXTRACTION_PORT]}"
+EXTRACTION_HOST_PORT="${VARS[EXTRACTION_HOST_PORT]}"
 INGESTION_PIPELINE_URL=http://ingestion-pipeline:${VARS[INGESTION_PORT]}
 RETRIEVAL_PIPELINE_URL=http://retrieval-pipeline:${VARS[RETRIEVAL_PORT]}
 GENERATION_PIPELINE_URL=http://generation-pipeline:${VARS[GENERATION_PORT]}
+EXTRACTION_PIPELINE_URL=http://extraction-pipeline:${VARS[EXTRACTION_PORT]}
 MAX_RESULTS=20
 VITE_API_URL=http://localhost:${VARS[BACKEND_PORT]}
 
@@ -715,37 +685,15 @@ if [ "${BACKEND_DB_MODE:-new}" = "new" ]; then
 fi
 
 if [ "${VECTOR_DB_MODE:-new}" = "new" ]; then
-  case "${VECTOR_DB_TYPE}" in
-    chroma)
-      ensure_container documind-chromadb \
-        --network "$NETWORK" \
-        -e IS_PERSISTENT=TRUE \
-        -e ANONYMIZED_TELEMETRY=FALSE \
-        -p 8000:8000 \
-        -v chroma_data:/chroma/chroma \
-        --restart unless-stopped \
-        chromadb/chroma:latest
-      ;;
-    qdrant)
-      ensure_container documind-qdrant \
-        --network "$NETWORK" \
-        -p 6333:6333 \
-        -v qdrant_data:/qdrant/storage \
-        --restart unless-stopped \
-        qdrant/qdrant:latest
-      ;;
-    pgvector)
-      ensure_container documind-pgvector \
-        --network "$NETWORK" \
-        -e POSTGRES_USER=paperless \
-        -e POSTGRES_PASSWORD=paperless \
-        -e POSTGRES_DB=paperless_ai \
-        -p 5433:5432 \
-        -v pgvector_data:/var/lib/postgresql/data \
-        --restart unless-stopped \
-        pgvector/pgvector:pg16
-      ;;
-  esac
+  ensure_container documind-pgvector \
+    --network "$NETWORK" \
+    -e POSTGRES_USER=paperless \
+    -e POSTGRES_PASSWORD=paperless \
+    -e POSTGRES_DB=paperless_ai \
+    -p 5433:5432 \
+    -v pgvector_data:/var/lib/postgresql/data \
+    --restart unless-stopped \
+    pgvector/pgvector:pg16
 fi
 
 # --- App-Container (Images aus GHCR) ---
@@ -765,13 +713,11 @@ ensure_container documind-backend \
   -e CUSTOM_BASE_URL="${CUSTOM_BASE_URL}" \
   -e CUSTOM_API_KEY="${CUSTOM_API_KEY}" \
   -e VECTOR_DB_TYPE="${VECTOR_DB_TYPE}" \
-  -e CHROMA_URL="${CHROMA_URL}" \
-  -e QDRANT_URL="${QDRANT_URL}" \
-  -e QDRANT_API_KEY="${QDRANT_API_KEY}" \
   -e PGVECTOR_URL="${PGVECTOR_URL}" \
   -e INGESTION_PIPELINE_URL="${INGESTION_PIPELINE_URL}" \
   -e RETRIEVAL_PIPELINE_URL="${RETRIEVAL_PIPELINE_URL}" \
   -e GENERATION_PIPELINE_URL="${GENERATION_PIPELINE_URL}" \
+  -e EXTRACTION_PIPELINE_URL="${EXTRACTION_PIPELINE_URL}" \
   -e EXTERNAL_API_ENABLED="${EXTERNAL_API_ENABLED}" \
   -e CONFIG_FILE="/data/config.json" \
   -e GATEWAY_API_TOKEN="${GATEWAY_API_TOKEN:-}" \
@@ -804,15 +750,11 @@ ensure_container documind-ingestion \
   -e EMBEDDING_MODEL="${EMBEDDING_MODEL}" \
   -e COLLECTION_NAME="${COLLECTION_NAME}" \
   -e SIMILARITY_METRIC="${SIMILARITY_METRIC}" \
-  -e CHROMA_URL="${CHROMA_URL}" \
-  -e QDRANT_URL="${QDRANT_URL}" \
-  -e QDRANT_API_KEY="${QDRANT_API_KEY}" \
   -e PGVECTOR_URL="${PGVECTOR_URL}" \
   -e KEYWORD_METHOD="${KEYWORD_METHOD}" \
   -e KEYWORD_WEIGHT="${KEYWORD_WEIGHT}" \
   -e SEMANTIC_WEIGHT="${SEMANTIC_WEIGHT}" \
   -e FTS_LANGUAGE="${FTS_LANGUAGE}" \
-  -e KEYWORD_INDEX_FILE="${KEYWORD_INDEX_FILE}" \
   -p "${INGESTION_HOST_PORT:-8001}:${INGESTION_PORT:-8001}" \
   -v "${DATA_VOLUME}:/app/data" \
   --restart unless-stopped \
@@ -832,15 +774,11 @@ ensure_container documind-retrieval \
   -e CROSS_ENCODER_MODEL="${CROSS_ENCODER_MODEL}" \
   -e COLLECTION_NAME="${COLLECTION_NAME}" \
   -e SIMILARITY_METRIC="${SIMILARITY_METRIC}" \
-  -e CHROMA_URL="${CHROMA_URL}" \
-  -e QDRANT_URL="${QDRANT_URL}" \
-  -e QDRANT_API_KEY="${QDRANT_API_KEY}" \
   -e PGVECTOR_URL="${PGVECTOR_URL}" \
   -e KEYWORD_METHOD="${KEYWORD_METHOD}" \
   -e KEYWORD_WEIGHT="${KEYWORD_WEIGHT}" \
   -e SEMANTIC_WEIGHT="${SEMANTIC_WEIGHT}" \
   -e FTS_LANGUAGE="${FTS_LANGUAGE}" \
-  -e KEYWORD_INDEX_FILE="${KEYWORD_INDEX_FILE}" \
   -p "${RETRIEVAL_HOST_PORT:-8002}:${RETRIEVAL_PORT:-8002}" \
   -v "${DATA_VOLUME}:/app/data" \
   --restart unless-stopped \
@@ -869,6 +807,30 @@ ensure_container documind-generation \
   --restart unless-stopped \
   "$REGISTRY/generation-pipeline:$TAG"
 
+ensure_image "$REGISTRY/extraction-pipeline:$TAG" extraction-pipeline
+ensure_container documind-extraction \
+  --network "$NETWORK" \
+  -e PYTHONUNBUFFERED=1 \
+  -e PORT="${EXTRACTION_PORT:-8004}" \
+  -e PGVECTOR_URL="${PGVECTOR_URL}" \
+  -e FACT_TABLE="${FACT_TABLE:-document_facts}" \
+  -e EXTRACTION_BATCH_SIZE="${EXTRACTION_BATCH_SIZE:-10}" \
+  -e LLM_PROVIDER="${LLM_PROVIDER}" \
+  -e LLM_MODEL="${LLM_MODEL}" \
+  -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
+  -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL}" \
+  -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+  -e CUSTOM_BASE_URL="${CUSTOM_BASE_URL}" \
+  -e CUSTOM_API_KEY="${CUSTOM_API_KEY}" \
+  -e CUSTOM_MODEL="${CUSTOM_MODEL}" \
+  -e OPENCODE_BASE_URL="${OPENCODE_BASE_URL}" \
+  -e OPENCODE_USERNAME="${OPENCODE_USERNAME}" \
+  -e OPENCODE_PASSWORD="${OPENCODE_PASSWORD}" \
+  -e OPENCODE_MODEL="${OPENCODE_MODEL}" \
+  -p "${EXTRACTION_HOST_PORT:-8004}:${EXTRACTION_PORT:-8004}" \
+  --restart unless-stopped \
+  "$REGISTRY/extraction-pipeline:$TAG"
+
 echo ""
 echo "[OK] Stack gestartet."
 echo "  Frontend:  http://localhost:3000"
@@ -876,6 +838,7 @@ echo "  Backend:   http://localhost:${BACKEND_PORT:-3001}"
   echo "  Ingestion: http://localhost:${INGESTION_HOST_PORT:-8001}"
   echo "  Retrieval: http://localhost:${RETRIEVAL_HOST_PORT:-8002}"
   echo "  Generation:http://localhost:${GENERATION_HOST_PORT:-8003}"
+  echo "  Extraction:http://localhost:${EXTRACTION_HOST_PORT:-8004}"
 STARTEOF
 
   # stop.sh
@@ -896,9 +859,9 @@ if [ -f .env ]; then
 fi
 NETWORK="${NETWORK_NAME:-documind}"
 
-for c in documind-generation documind-retrieval documind-ingestion \
+for c in documind-extraction documind-generation documind-retrieval documind-ingestion \
          documind-frontend documind-backend \
-         documind-pgvector documind-qdrant documind-chromadb documind-postgres; do
+         documind-pgvector documind-postgres; do
   if docker inspect "$c" >/dev/null 2>&1; then
     echo "[INFO] Stoppe $c ..."
     docker rm -f "$c"

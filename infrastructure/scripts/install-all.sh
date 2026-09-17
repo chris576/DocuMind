@@ -83,8 +83,8 @@ PIP="$VENV_DIR/bin/pip"
 "$PIP" install -q --upgrade pip
 
 # Fach-Pakete (editable installiert): bringen alle ML-/Runtime-Deps mit
-# (sentence-transformers, chromadb, qdrant-client, psycopg2, rank-bm25, nltk,
-# openai, anthropic, pydantic, requests, httpx, aio-pika, ...)
+# (sentence-transformers, psycopg2-binary, openai, anthropic, pydantic,
+# requests, httpx, ...)
 info "Installiere Python-Fach-Pakete (python-common, python-dms, python-llm, python-vectordb) ..."
 "$PIP" install -q \
   -e "$REPO_ROOT/packages/python-common" \
@@ -93,10 +93,9 @@ info "Installiere Python-Fach-Pakete (python-common, python-dms, python-llm, pyt
   -e "$REPO_ROOT/packages/python-vectordb"
 ok "Python-Fach-Pakete installiert."
 
-# Pipeline-Runtime-Deps (fastapi/uvicorn/dotenv) — identisch in allen 3 Pipelines
-# + Retrieval-Extras (rank-bm25, nltk)
-info "Installiere Pipeline-Runtime-Deps (fastapi, uvicorn, python-dotenv, rank-bm25, nltk) ..."
-"$PIP" install -q "fastapi>=0.115.0" "uvicorn>=0.32.0" "python-dotenv>=1.0.0" "rank-bm25>=0.2.2" "nltk>=3.9.0"
+# Pipeline-Runtime-Deps (fastapi/uvicorn/dotenv) — identisch in allen 4 Pipelines
+info "Installiere Pipeline-Runtime-Deps (fastapi, uvicorn, python-dotenv) ..."
+"$PIP" install -q "fastapi>=0.115.0" "uvicorn>=0.32.0" "python-dotenv>=1.0.0"
 ok "Pipeline-Runtime-Deps installiert."
 
 # Test-/Analyse-Tools (Test-Harness): pytest-cov, coverage, mypy, bandit, ruff
@@ -117,6 +116,7 @@ echo "Pipelines starten (jeweils im App-Verzeichnis):"
 echo "  cd apps/ingestion-pipeline && ../../.venv/bin/python main.py"
 echo "  cd apps/retrieval-pipeline  && ../../.venv/bin/python main.py"
 echo "  cd apps/generation-pipeline && ../../.venv/bin/python main.py"
+echo "  cd apps/extraction-pipeline && ../../.venv/bin/python main.py"
 echo ""
 echo "Node-Services:  pnpm dev"
 echo ""

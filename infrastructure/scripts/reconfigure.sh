@@ -239,23 +239,10 @@ configure_llm() {
 configure_vector_db() {
   echo ""
   echo -e "${CYAN}=== Vector Database Configuration ===${NC}"
-  select_option VECTOR_DB_TYPE "Vector database type" chroma qdrant pgvector
-
-  case "${VARS[VECTOR_DB_TYPE]}" in
-    chroma)
-      VARS["CHROMA_URL"]="${VARS[CHROMA_URL]:-http://chromadb:8000}"
-      prompt_url "CHROMA_URL" "Chroma URL"
-      ;;
-    qdrant)
-      VARS["QDRANT_URL"]="${VARS[QDRANT_URL]:-http://qdrant:6333}"
-      prompt_url "QDRANT_URL" "Qdrant URL"
-      prompt "QDRANT_API_KEY" "Qdrant API key (optional)"
-      ;;
-    pgvector)
-      VARS["PGVECTOR_URL"]="${VARS[PGVECTOR_URL]:-}"
-      prompt_url "PGVECTOR_URL" "PGVector connection URL"
-      ;;
-  esac
+  VARS["VECTOR_DB_TYPE"]="pgvector"
+  info "Vector database: PostgreSQL/PGVector (fixed stack)."
+  VARS["PGVECTOR_URL"]="${VARS[PGVECTOR_URL]:-}"
+  prompt_url "PGVECTOR_URL" "PGVector connection URL"
 }
 
 configure_legacy() {
@@ -405,30 +392,9 @@ EOF
 # Vector Database
 # ------------------------------------------------------------
 VECTOR_DB_TYPE=${VARS[VECTOR_DB_TYPE]}
-
-EOF
-
-  case "${VARS[VECTOR_DB_TYPE]}" in
-    chroma)
-      cat >> "$ENV_FILE" <<EOF
-CHROMA_URL=${VARS[CHROMA_URL]}
-
-EOF
-      ;;
-    qdrant)
-      cat >> "$ENV_FILE" <<EOF
-QDRANT_URL=${VARS[QDRANT_URL]}
-QDRANT_API_KEY=${VARS[QDRANT_API_KEY]}
-
-EOF
-      ;;
-    pgvector)
-      cat >> "$ENV_FILE" <<EOF
 PGVECTOR_URL=${VARS[PGVECTOR_URL]}
 
 EOF
-      ;;
-  esac
 
   cat >> "$ENV_FILE" <<EOF
 # ------------------------------------------------------------

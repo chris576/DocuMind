@@ -19,7 +19,7 @@ maintained in two places:
   - `architecture/` — architecture overviews (e.g. connector layer)
   - `decisions/` — architecture decision records (ADRs)
   - `connectors/` — DMS/ERP connector documentation
-  - `pipelines/` — ingestion/retrieval/generation pipeline documentation
+  - `pipelines/` — ingestion/retrieval/generation/extraction pipeline documentation
 - **Agent memory** (fast, machine-readable): `/memories/repo/` (e.g. `build-facts.md`)
 
 ## Project Structure
@@ -31,9 +31,13 @@ apps/
   ingestion-pipeline/   Python FastAPI (port 8001)
   retrieval-pipeline/   Python FastAPI (port 8002)
   generation-pipeline/  Python FastAPI (port 8003)
+  extraction-pipeline/  Python FastAPI (port 8004) — strukturierte Fakten
 packages/
   shared/               Shared TS types/DTOs/enums
   config/               Zod environment validation
-  vector-db/            Chroma/Qdrant/PGVector factory
+  python-common/        Shared Python utilities (config client, http, env)
+  python-dms/           DMS connectors (Paperless, Docspell)
+  python-llm/           LLM provider abstraction (OpenAI, Ollama, Anthropic, OpenCode, ...)
+  python-vectordb/      PostgreSQL/PGVector adapter (embeddings + facts)
 infrastructure/         Docker Compose (prod + dev)
 
