@@ -1,6 +1,6 @@
 {
-  "name": "@chrid235/documind-mcp-server",
-  "version": "1.0.0",
+  "name": "@docmind/documind-mcp-server",
+  "version": "0.0.2",
   "description": "Local stdio MCP server for DocuMind — bridges MCP tools to the DocuMind gateway.",
   "type": "module",
   "bin": {

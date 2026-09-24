@@ -192,7 +192,7 @@ als Multi-Arch-Manifest (`linux/amd64`, `linux/arm64`) veröffentlicht.
 
 ### MCP-Server (npm)
 
-Der lokale MCP-Server ist als `@chrid235/documind-mcp-server` auf npm verfügbar
+Der lokale MCP-Server ist als `@docmind/documind-mcp-server` auf npm verfügbar
 und lässt sich direkt per `npx` in Agenten einbinden:
 
 ```json
@@ -200,7 +200,7 @@ und lässt sich direkt per `npx` in Agenten einbinden:
   "mcpServers": {
     "documind": {
       "command": "npx",
-      "args": ["-y", "@chrid235/documind-mcp-server"],
+      "args": ["-y", "@docmind/documind-mcp-server"],
       "env": {
         "GATEWAY_URL": "http://localhost:3001",
         "GATEWAY_API_TOKEN": "dein-token"
