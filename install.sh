@@ -81,12 +81,17 @@ for arg in "$@"; do
 done
 
 # --- Interaktive Prompts (stdin) -------------------------------------------
-# Bei `curl ... | bash` / `wget ... | bash` ist stdin (fd 0) eine Pipe, die nach
-# dem Einlesen des Skripts am EOF steht. Der erste interaktive `read` würde dann
-# sofort mit Exit 1 abbrechen (set -e). Daher Prompts aus /dev/tty lesen.
-# Bei --quickstart (non-interaktiv) ist kein Terminal erforderlich.
+# Bei `curl ... | bash` / `wget ... | bash` liest bash das Skript selbst aus
+# stdin (fd 0, eine Pipe mit dem Skript-Inhalt). fd 0 darf deshalb NICHT
+# umgeleitet werden — sonst liest bash den Rest des Skripts nicht mehr aus der
+# Pipe (curl: 23 "Failure writing output to destination"). Interaktive Prompts
+# lesen daher über einen eigenen Deskriptor (fd 3) aus /dev/tty. Läuft das
+# Skript normal im Terminal (fd 0 ist eine TTY), bleibt fd 0 die Eingabequelle.
+PROMPT_FD=0
 if [ ! -t 0 ]; then
-  if ! { exec </dev/tty; } 2>/dev/null && [ "$QUICKSTART" != "1" ]; then
+  if { exec 3<>/dev/tty; } 2>/dev/null; then
+    PROMPT_FD=3
+  elif [ "$QUICKSTART" != "1" ]; then
     error "Kein Terminal zum interaktiven Abfragen verfügbar."
     error "Non-interaktive Installation: bash install.sh --quickstart"
     exit 1
@@ -97,9 +102,9 @@ fi
 prompt() {
   local varname="$1" message="$2" default="${VARS[$1]:-}" input
   if [ -n "$default" ]; then
-    read -rp "$(echo -e "${CYAN}?${NC} $message [${YELLOW}$default${NC}]: ")" input
+    read -u "$PROMPT_FD" -rp "$(echo -e "${CYAN}?${NC} $message [${YELLOW}$default${NC}]: ")" input
   else
-    read -rp "$(echo -e "${CYAN}?${NC} $message: ")" input
+    read -u "$PROMPT_FD" -rp "$(echo -e "${CYAN}?${NC} $message: ")" input
   fi
   VARS["$varname"]="${input:-$default}"
 }
@@ -107,9 +112,9 @@ prompt() {
 prompt_secret() {
   local varname="$1" message="$2" default="${VARS[$1]:-}" input
   if [ -n "$default" ]; then
-    read -rsp "$(echo -e "${CYAN}?${NC} $message [${YELLOW}********${NC}]: ")" input
+    read -u "$PROMPT_FD" -rsp "$(echo -e "${CYAN}?${NC} $message [${YELLOW}********${NC}]: ")" input
   else
-    read -rsp "$(echo -e "${CYAN}?${NC} $message: ")" input
+    read -u "$PROMPT_FD" -rsp "$(echo -e "${CYAN}?${NC} $message: ")" input
   fi
   echo ""
   VARS["$varname"]="${input:-$default}"
@@ -130,9 +135,9 @@ prompt_required() {
 prompt_yesno() {
   local varname="$1" message="$2" default="${VARS[$1]:-}" input
   if [ -n "$default" ]; then
-    read -rp "$(echo -e "${CYAN}?${NC} $message [y/N] [${YELLOW}$default${NC}]: ")" input
+    read -u "$PROMPT_FD" -rp "$(echo -e "${CYAN}?${NC} $message [y/N] [${YELLOW}$default${NC}]: ")" input
   else
-    read -rp "$(echo -e "${CYAN}?${NC} $message [y/N]: ")" input
+    read -u "$PROMPT_FD" -rp "$(echo -e "${CYAN}?${NC} $message [y/N]: ")" input
   fi
   input="${input:-$default}"
   case "$input" in
@@ -169,7 +174,7 @@ select_option() {
     fi
     echo "  $((i+1))) ${options[$i]}"
   done
-  read -rp "Auswahl [1-${#options[@]}] [${YELLOW}$default_idx${NC}]: " choice
+  read -u "$PROMPT_FD" -rp "Auswahl [1-${#options[@]}] [${YELLOW}$default_idx${NC}]: " choice
   choice="${choice:-$default_idx}"
   if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
     VARS["$varname"]="${options[$((choice-1))]}"
@@ -224,7 +229,7 @@ ensure_repo() {
   else
     echo ""
     echo -e "${CYAN}?${NC} Installationsverzeichnis [${YELLOW}$target${NC}]: "
-    read -r input
+    read -u "$PROMPT_FD" -r input
   fi
   target="${input:-$target}"
   info "Klone ${REPO_URL} nach $target ..."
