@@ -19,6 +19,15 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 ok() { echo -e "${GREEN}[OK]${NC} $*"; }
 
+# Interaktive Prompts aus /dev/tty lesen, wenn stdin keine TTY ist
+# (z. B. `... | bash`). Sonst bricht der erste `read` mit EOF ab (set -e).
+if [ ! -t 0 ]; then
+  if ! { exec </dev/tty; } 2>/dev/null; then
+    error "No terminal available for interactive prompts."
+    exit 1
+  fi
+fi
+
 declare -A VARS
 
 load_env() {

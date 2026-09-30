@@ -114,3 +114,19 @@ jobs:
 
       - name: Run integration tests
         run: pnpm --filter @documind/backend test:integration
+
+  installer-scripts:
+    name: Installer Scripts (shellcheck + smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Shellcheck
+        run: shellcheck install.sh infrastructure/scripts/reconfigure.sh
+
+      - name: Smoke test (quickstart dry-run)
+        run: bash install.sh --quickstart --dry-run

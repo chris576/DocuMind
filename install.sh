@@ -80,6 +80,19 @@ for arg in "$@"; do
   esac
 done
 
+# --- Interaktive Prompts (stdin) -------------------------------------------
+# Bei `curl ... | bash` / `wget ... | bash` ist stdin (fd 0) eine Pipe, die nach
+# dem Einlesen des Skripts am EOF steht. Der erste interaktive `read` würde dann
+# sofort mit Exit 1 abbrechen (set -e). Daher Prompts aus /dev/tty lesen.
+# Bei --quickstart (non-interaktiv) ist kein Terminal erforderlich.
+if [ ! -t 0 ]; then
+  if ! { exec </dev/tty; } 2>/dev/null && [ "$QUICKSTART" != "1" ]; then
+    error "Kein Terminal zum interaktiven Abfragen verfügbar."
+    error "Non-interaktive Installation: bash install.sh --quickstart"
+    exit 1
+  fi
+fi
+
 # --- Prompt-Helfer ----------------------------------------------------------
 prompt() {
   local varname="$1" message="$2" default="${VARS[$1]:-}" input
@@ -206,9 +219,13 @@ ensure_repo() {
     info "Repo-Verzeichnis existiert bereits: ${REPO_DIR}"
     return 0
   fi
-  echo ""
-  echo -e "${CYAN}?${NC} Installationsverzeichnis [${YELLOW}$target${NC}]: "
-  read -r input
+  if [ "$QUICKSTART" = "1" ]; then
+    input=""
+  else
+    echo ""
+    echo -e "${CYAN}?${NC} Installationsverzeichnis [${YELLOW}$target${NC}]: "
+    read -r input
+  fi
   target="${input:-$target}"
   info "Klone ${REPO_URL} nach $target ..."
   git clone "$REPO_URL" "$target"
@@ -613,6 +630,12 @@ set -euo pipefail
 # DocuMind Stack starten (docker run, kein Compose)
 # Generiert von install.sh — bei Bedarf anpassen.
 
+# Interaktive Prompts (z. B. "Image lokal bauen?") aus /dev/tty lesen,
+# falls stdin keine TTY ist (z. B. bei Ausführung ohne Terminal).
+if [ ! -t 0 ]; then
+  { exec </dev/tty; } 2>/dev/null || true
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -660,7 +683,11 @@ ensure_image() {
   fi
   echo "[WARN] Pull fehlgeschlagen: $image" >&2
   if [ -d "apps/$service" ]; then
-    read -rp "Image lokal bauen (docker build)? [y/N]: " ans
+    if [ -t 0 ]; then
+      read -rp "Image lokal bauen (docker build)? [y/N]: " ans
+    else
+      ans="n"
+    fi
     if [[ "$ans" =~ ^[Yy] ]]; then
       docker build -t "$image" "apps/$service" \
         || echo "[WARN] Build fehlgeschlagen (Build-Kontext packages/ prüfen)." >&2
@@ -966,8 +993,12 @@ main() {
     return 0
   fi
 
-  echo ""
-  prompt_yesno START_NOW "Stack jetzt starten?"
+  if [ "$QUICKSTART" = "1" ]; then
+    VARS["START_NOW"]="yes"
+  else
+    echo ""
+    prompt_yesno START_NOW "Stack jetzt starten?"
+  fi
   if [ "${VARS[START_NOW]}" = "yes" ]; then
     bash "$REPO_DIR/start.sh"
   else
